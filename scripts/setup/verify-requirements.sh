@@ -20,7 +20,24 @@ echo
 # Función para verificar comandos
 check_command() {
     if command -v $1 &> /dev/null; then
-        local version=$($1 --version 2>/dev/null | head -1 || echo "Instalado")
+        local version=""
+        case $1 in
+            "kubectl")
+                version=$(kubectl version --client 2>/dev/null | grep "Client Version" | head -1 || echo "kubectl instalado")
+                ;;
+            "helm")
+                version=$(helm version --short 2>/dev/null || helm version 2>/dev/null | head -1 || echo "helm instalado")
+                ;;
+            "docker")
+                version=$(docker --version 2>/dev/null || echo "docker instalado")
+                ;;
+            "minikube")
+                version=$(minikube version 2>/dev/null | head -1 || echo "minikube instalado")
+                ;;
+            *)
+                version=$($1 --version 2>/dev/null | head -1 || echo "$1 instalado")
+                ;;
+        esac
         echo -e "${GREEN}✅ $1: $version${NC}"
         return 0
     else
@@ -36,7 +53,21 @@ check_version() {
     local min_version=$3
     
     if command -v $cmd &> /dev/null; then
-        local current_version=$($version_cmd 2>/dev/null | head -1)
+        local current_version=""
+        case $cmd in
+            "kubectl")
+                current_version=$(kubectl version --client 2>/dev/null | grep "Client Version" | head -1 || echo "kubectl - versión no detectada")
+                ;;
+            "helm")
+                current_version=$(helm version --short 2>/dev/null || helm version 2>/dev/null | head -1 || echo "helm - versión no detectada")
+                ;;
+            "docker")
+                current_version=$(docker --version 2>/dev/null || echo "docker - versión no detectada")
+                ;;
+            *)
+                current_version=$($version_cmd 2>/dev/null | head -1 || echo "$cmd - versión no detectada")
+                ;;
+        esac
         echo -e "${GREEN}✅ $cmd: $current_version${NC}"
         return 0
     else

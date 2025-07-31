@@ -69,8 +69,11 @@ yq --version             # Para procesamiento YAML
 git clone <repository-url>
 cd backstage_openwebui
 
-# 2. Verificar requisitos del sistema
+# 2. Verificar requisitos del sistema (completo)
 make verify-requirements
+
+# O verificación rápida de herramientas
+make verify-tools
 ```
 
 ### **Paso 2: Setup Automático**
@@ -280,6 +283,12 @@ echo "MkDocs:    http://localhost:8082"
 ```bash
 # Ver todos los comandos disponibles
 make help
+
+# Verificar requisitos (completo)
+make verify-requirements
+
+# Verificar herramientas (rápido)
+make verify-tools
 
 # Información del sistema
 make info

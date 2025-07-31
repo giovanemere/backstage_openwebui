@@ -33,6 +33,16 @@ verify-requirements: ## Verificar requisitos del sistema
 	@echo "$(BLUE)Verificando requisitos del sistema...$(NC)"
 	@./scripts/setup/verify-requirements.sh
 
+verify-tools: ## Verificación rápida de herramientas básicas
+	@echo "$(BLUE)Verificación rápida de herramientas...$(NC)"
+	@echo "$(YELLOW)Verificando herramientas esenciales:$(NC)"
+	@command -v docker >/dev/null 2>&1 && echo "$(GREEN)✅ Docker: $$(docker --version)$(NC)" || echo "$(RED)❌ Docker: No encontrado$(NC)"
+	@command -v kubectl >/dev/null 2>&1 && echo "$(GREEN)✅ kubectl: $$(kubectl version --client 2>/dev/null | grep 'Client Version' | head -1)$(NC)" || echo "$(RED)❌ kubectl: No encontrado$(NC)"
+	@command -v helm >/dev/null 2>&1 && echo "$(GREEN)✅ Helm: $$(helm version --short 2>/dev/null || helm version 2>/dev/null | head -1)$(NC)" || echo "$(RED)❌ Helm: No encontrado$(NC)"
+	@command -v make >/dev/null 2>&1 && echo "$(GREEN)✅ Make: $$(make --version | head -1)$(NC)" || echo "$(RED)❌ Make: No encontrado$(NC)"
+	@command -v git >/dev/null 2>&1 && echo "$(GREEN)✅ Git: $$(git --version)$(NC)" || echo "$(RED)❌ Git: No encontrado$(NC)"
+	@echo "$(CYAN)Para verificación completa ejecuta: make verify-requirements$(NC)"
+
 setup-minikube: ## Instalar y configurar Minikube
 	@echo "$(BLUE)Configurando Minikube...$(NC)"
 	@./scripts/setup/install-minikube.sh
