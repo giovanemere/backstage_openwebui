@@ -1,8 +1,7 @@
 #!/bin/bash
 
-# Script para verificar requisitos del sistema para Backstage + OpenWebUI Demo
-# Autor: Amazon Q
-# Fecha: 2025-07-30
+# Script de verificación de requisitos del sistema
+# Verifica que el sistema cumple con los requisitos mínimos para ejecutar el demo
 
 set -e
 
@@ -11,249 +10,223 @@ RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 BLUE='\033[0;34m'
-NC='\033[0m' # No Color
+CYAN='\033[0;36m'
+NC='\033[0m'
 
-# Función para imprimir mensajes
-print_info() {
-    echo -e "${BLUE}[INFO]${NC} $1"
-}
+echo -e "${BLUE}🔍 Verificando requisitos del sistema para Backstage + OpenWebUI...${NC}"
+echo -e "${CYAN}   Plataforma de desarrollo con IA integrada${NC}"
+echo
 
-print_success() {
-    echo -e "${GREEN}[SUCCESS]${NC} $1"
-}
-
-print_warning() {
-    echo -e "${YELLOW}[WARNING]${NC} $1"
-}
-
-print_error() {
-    echo -e "${RED}[ERROR]${NC} $1"
-}
-
-# Variables de requisitos
-MIN_RAM_GB=8
-RECOMMENDED_RAM_GB=12
-MIN_CPU_CORES=4
-RECOMMENDED_CPU_CORES=6
-MIN_DISK_GB=20
-RECOMMENDED_DISK_GB=30
-
-# Contadores
-ERRORS=0
-WARNINGS=0
-
-print_info "Verificando requisitos del sistema para Backstage + OpenWebUI Demo..."
-echo ""
-
-# Verificar sistema operativo
-print_info "Verificando sistema operativo..."
-OS=$(uname -s)
-case $OS in
-    Linux*)
-        print_success "Sistema operativo: Linux ✓"
-        ;;
-    Darwin*)
-        print_success "Sistema operativo: macOS ✓"
-        ;;
-    CYGWIN*|MINGW*|MSYS*)
-        print_success "Sistema operativo: Windows con WSL/Git Bash ✓"
-        ;;
-    *)
-        print_error "Sistema operativo no soportado: $OS"
-        ERRORS=$((ERRORS + 1))
-        ;;
-esac
-
-# Verificar RAM
-print_info "Verificando memoria RAM..."
-if command -v free >/dev/null 2>&1; then
-    # Linux
-    TOTAL_RAM_KB=$(free | grep '^Mem:' | awk '{print $2}')
-    TOTAL_RAM_GB=$((TOTAL_RAM_KB / 1024 / 1024))
-elif command -v vm_stat >/dev/null 2>&1; then
-    # macOS
-    TOTAL_RAM_BYTES=$(sysctl -n hw.memsize)
-    TOTAL_RAM_GB=$((TOTAL_RAM_BYTES / 1024 / 1024 / 1024))
-else
-    print_warning "No se pudo determinar la cantidad de RAM automáticamente"
-    TOTAL_RAM_GB=0
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-if [ $TOTAL_RAM_GB -ge $RECOMMENDED_RAM_GB ]; then
-    print_success "RAM: ${TOTAL_RAM_GB}GB (Recomendado: ${RECOMMENDED_RAM_GB}GB+) ✓"
-elif [ $TOTAL_RAM_GB -ge $MIN_RAM_GB ]; then
-    print_warning "RAM: ${TOTAL_RAM_GB}GB (Mínimo: ${MIN_RAM_GB}GB, Recomendado: ${RECOMMENDED_RAM_GB}GB+)"
-    WARNINGS=$((WARNINGS + 1))
-elif [ $TOTAL_RAM_GB -gt 0 ]; then
-    print_error "RAM insuficiente: ${TOTAL_RAM_GB}GB (Mínimo requerido: ${MIN_RAM_GB}GB)"
-    ERRORS=$((ERRORS + 1))
-fi
-
-# Verificar CPU
-print_info "Verificando CPU..."
-if command -v nproc >/dev/null 2>&1; then
-    # Linux
-    CPU_CORES=$(nproc)
-elif command -v sysctl >/dev/null 2>&1; then
-    # macOS
-    CPU_CORES=$(sysctl -n hw.ncpu)
-else
-    print_warning "No se pudo determinar el número de cores de CPU automáticamente"
-    CPU_CORES=0
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-if [ $CPU_CORES -ge $RECOMMENDED_CPU_CORES ]; then
-    print_success "CPU: ${CPU_CORES} cores (Recomendado: ${RECOMMENDED_CPU_CORES}+) ✓"
-elif [ $CPU_CORES -ge $MIN_CPU_CORES ]; then
-    print_warning "CPU: ${CPU_CORES} cores (Mínimo: ${MIN_CPU_CORES}, Recomendado: ${RECOMMENDED_CPU_CORES}+)"
-    WARNINGS=$((WARNINGS + 1))
-elif [ $CPU_CORES -gt 0 ]; then
-    print_error "CPU insuficiente: ${CPU_CORES} cores (Mínimo requerido: ${MIN_CPU_CORES})"
-    ERRORS=$((ERRORS + 1))
-fi
-
-# Verificar espacio en disco
-print_info "Verificando espacio en disco..."
-if command -v df >/dev/null 2>&1; then
-    DISK_AVAILABLE_KB=$(df . | tail -1 | awk '{print $4}')
-    DISK_AVAILABLE_GB=$((DISK_AVAILABLE_KB / 1024 / 1024))
-    
-    if [ $DISK_AVAILABLE_GB -ge $RECOMMENDED_DISK_GB ]; then
-        print_success "Espacio en disco: ${DISK_AVAILABLE_GB}GB disponibles (Recomendado: ${RECOMMENDED_DISK_GB}GB+) ✓"
-    elif [ $DISK_AVAILABLE_GB -ge $MIN_DISK_GB ]; then
-        print_warning "Espacio en disco: ${DISK_AVAILABLE_GB}GB disponibles (Mínimo: ${MIN_DISK_GB}GB, Recomendado: ${RECOMMENDED_DISK_GB}GB+)"
-        WARNINGS=$((WARNINGS + 1))
+# Función para verificar comandos
+check_command() {
+    if command -v $1 &> /dev/null; then
+        local version=$($1 --version 2>/dev/null | head -1 || echo "Instalado")
+        echo -e "${GREEN}✅ $1: $version${NC}"
+        return 0
     else
-        print_error "Espacio en disco insuficiente: ${DISK_AVAILABLE_GB}GB disponibles (Mínimo requerido: ${MIN_DISK_GB}GB)"
-        ERRORS=$((ERRORS + 1))
+        echo -e "${RED}❌ $1: No encontrado${NC}"
+        return 1
     fi
-else
-    print_warning "No se pudo verificar el espacio en disco automáticamente"
-    WARNINGS=$((WARNINGS + 1))
-fi
+}
 
-# Verificar Docker
-print_info "Verificando Docker..."
-if command -v docker >/dev/null 2>&1; then
-    if docker --version >/dev/null 2>&1; then
-        DOCKER_VERSION=$(docker --version | cut -d' ' -f3 | cut -d',' -f1)
-        print_success "Docker instalado: v${DOCKER_VERSION} ✓"
-        
-        # Verificar que Docker esté corriendo
-        if docker info >/dev/null 2>&1; then
-            print_success "Docker daemon está corriendo ✓"
+# Función para verificar versión específica
+check_version() {
+    local cmd=$1
+    local version_cmd=$2
+    local min_version=$3
+    
+    if command -v $cmd &> /dev/null; then
+        local current_version=$($version_cmd 2>/dev/null | head -1)
+        echo -e "${GREEN}✅ $cmd: $current_version${NC}"
+        return 0
+    else
+        echo -e "${RED}❌ $cmd: No encontrado (versión mínima: $min_version)${NC}"
+        return 1
+    fi
+}
+
+# Función para mostrar instrucciones de instalación
+show_install_instructions() {
+    echo -e "\n${YELLOW}📋 Instrucciones de instalación para herramientas faltantes:${NC}"
+    
+    if ! command -v docker &> /dev/null; then
+        echo -e "${CYAN}🐳 Docker:${NC}"
+        echo "   Ubuntu/Debian: curl -fsSL https://get.docker.com -o get-docker.sh && sh get-docker.sh"
+        echo "   CentOS/RHEL:   sudo yum install -y docker-ce docker-ce-cli containerd.io"
+        echo "   macOS:         brew install --cask docker"
+    fi
+    
+    if ! command -v kubectl &> /dev/null; then
+        echo -e "${CYAN}☸️  kubectl:${NC}"
+        echo "   Linux:   curl -LO https://dl.k8s.io/release/\$(curl -L -s https://dl.k8s.io/release/stable.txt)/bin/linux/amd64/kubectl"
+        echo "   macOS:   brew install kubectl"
+    fi
+    
+    if ! command -v helm &> /dev/null; then
+        echo -e "${CYAN}⛵ Helm:${NC}"
+        echo "   Linux:   curl https://raw.githubusercontent.com/helm/helm/main/scripts/get-helm-3 | bash"
+        echo "   macOS:   brew install helm"
+    fi
+    
+    if ! command -v make &> /dev/null; then
+        echo -e "${CYAN}🔨 Make:${NC}"
+        echo "   Ubuntu/Debian: sudo apt-get install build-essential"
+        echo "   CentOS/RHEL:   sudo yum groupinstall 'Development Tools'"
+        echo "   macOS:         xcode-select --install"
+    fi
+}
+
+# Verificar herramientas esenciales
+echo -e "${YELLOW}📋 Verificando herramientas esenciales:${NC}"
+
+TOOLS_OK=true
+
+check_command "docker" || TOOLS_OK=false
+check_command "kubectl" || TOOLS_OK=false
+check_command "helm" || TOOLS_OK=false
+check_command "make" || TOOLS_OK=false
+check_command "git" || TOOLS_OK=false
+
+# Verificar versiones específicas
+echo -e "\n${YELLOW}🔢 Verificando versiones mínimas:${NC}"
+
+check_version "docker" "docker --version" "20.10+" || TOOLS_OK=false
+check_version "kubectl" "kubectl version --client --short" "1.24+" || TOOLS_OK=false
+check_version "helm" "helm version --short" "3.8+" || TOOLS_OK=false
+
+# Verificar recursos del sistema
+echo -e "\n${YELLOW}💻 Verificando recursos del sistema:${NC}"
+
+# RAM
+if command -v free &> /dev/null; then
+    TOTAL_RAM=$(free -m | awk 'NR==2{printf "%.0f", $2/1024}')
+    AVAILABLE_RAM=$(free -m | awk 'NR==2{printf "%.0f", $7/1024}')
+    
+    if [ $TOTAL_RAM -ge 8 ]; then
+        echo -e "${GREEN}✅ RAM Total: ${TOTAL_RAM}GB (mínimo: 8GB)${NC}"
+        if [ $AVAILABLE_RAM -ge 4 ]; then
+            echo -e "${GREEN}✅ RAM Disponible: ${AVAILABLE_RAM}GB (mínimo: 4GB)${NC}"
         else
-            print_error "Docker está instalado pero el daemon no está corriendo"
-            ERRORS=$((ERRORS + 1))
+            echo -e "${YELLOW}⚠️  RAM Disponible: ${AVAILABLE_RAM}GB (recomendado: 4GB+)${NC}"
         fi
     else
-        print_error "Docker está instalado pero no funciona correctamente"
-        ERRORS=$((ERRORS + 1))
+        echo -e "${RED}❌ RAM Total: ${TOTAL_RAM}GB (mínimo requerido: 8GB)${NC}"
+        TOOLS_OK=false
     fi
 else
-    print_error "Docker no está instalado"
-    ERRORS=$((ERRORS + 1))
+    echo -e "${YELLOW}⚠️  No se puede verificar RAM en este sistema${NC}"
 fi
 
-# Verificar kubectl
-print_info "Verificando kubectl..."
-if command -v kubectl >/dev/null 2>&1; then
-    KUBECTL_VERSION=$(kubectl version --client --short 2>/dev/null | cut -d' ' -f3)
-    print_success "kubectl instalado: ${KUBECTL_VERSION} ✓"
+# CPU
+CPU_CORES=$(nproc 2>/dev/null || sysctl -n hw.ncpu 2>/dev/null || echo "unknown")
+if [ "$CPU_CORES" != "unknown" ] && [ $CPU_CORES -ge 4 ]; then
+    echo -e "${GREEN}✅ CPU: ${CPU_CORES} cores (mínimo: 4 cores)${NC}"
+elif [ "$CPU_CORES" != "unknown" ]; then
+    echo -e "${RED}❌ CPU: ${CPU_CORES} cores (mínimo requerido: 4 cores)${NC}"
+    TOOLS_OK=false
 else
-    print_warning "kubectl no está instalado (se instalará con Minikube)"
-    WARNINGS=$((WARNINGS + 1))
+    echo -e "${YELLOW}⚠️  No se puede verificar CPU en este sistema${NC}"
 fi
 
-# Verificar Minikube
-print_info "Verificando Minikube..."
-if command -v minikube >/dev/null 2>&1; then
-    MINIKUBE_VERSION=$(minikube version --short 2>/dev/null || echo "unknown")
-    print_success "Minikube instalado: ${MINIKUBE_VERSION} ✓"
-else
-    print_warning "Minikube no está instalado (se instalará automáticamente)"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# Verificar Helm
-print_info "Verificando Helm..."
-if command -v helm >/dev/null 2>&1; then
-    HELM_VERSION=$(helm version --short 2>/dev/null | cut -d'+' -f1)
-    print_success "Helm instalado: ${HELM_VERSION} ✓"
-else
-    print_warning "Helm no está instalado (se instalará automáticamente)"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# Verificar Node.js (para desarrollo)
-print_info "Verificando Node.js..."
-if command -v node >/dev/null 2>&1; then
-    NODE_VERSION=$(node --version)
-    print_success "Node.js instalado: ${NODE_VERSION} ✓"
-else
-    print_warning "Node.js no está instalado (necesario solo para desarrollo local)"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# Verificar Python (para OpenWebUI)
-print_info "Verificando Python..."
-if command -v python3 >/dev/null 2>&1; then
-    PYTHON_VERSION=$(python3 --version | cut -d' ' -f2)
-    print_success "Python instalado: v${PYTHON_VERSION} ✓"
-elif command -v python >/dev/null 2>&1; then
-    PYTHON_VERSION=$(python --version | cut -d' ' -f2)
-    print_success "Python instalado: v${PYTHON_VERSION} ✓"
-else
-    print_warning "Python no está instalado (necesario solo para desarrollo local)"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# Verificar Make
-print_info "Verificando Make..."
-if command -v make >/dev/null 2>&1; then
-    MAKE_VERSION=$(make --version | head -1 | cut -d' ' -f3)
-    print_success "Make instalado: v${MAKE_VERSION} ✓"
-else
-    print_warning "Make no está instalado (recomendado para usar Makefile)"
-    WARNINGS=$((WARNINGS + 1))
-fi
-
-# Verificar Git
-print_info "Verificando Git..."
-if command -v git >/dev/null 2>&1; then
-    GIT_VERSION=$(git --version | cut -d' ' -f3)
-    print_success "Git instalado: v${GIT_VERSION} ✓"
-else
-    print_error "Git no está instalado (requerido)"
-    ERRORS=$((ERRORS + 1))
-fi
-
-echo ""
-print_info "=== RESUMEN DE VERIFICACIÓN ==="
-
-if [ $ERRORS -eq 0 ] && [ $WARNINGS -eq 0 ]; then
-    print_success "✅ Todos los requisitos están satisfechos. Sistema listo para la demo."
-    exit 0
-elif [ $ERRORS -eq 0 ]; then
-    print_warning "⚠️  Sistema funcional con ${WARNINGS} advertencia(s). La demo debería funcionar."
-    echo ""
-    print_info "Recomendaciones:"
-    print_info "- Instalar herramientas faltantes para mejor experiencia"
-    print_info "- Considerar upgrade de hardware si es posible"
-    exit 0
-else
-    print_error "❌ Se encontraron ${ERRORS} error(es) crítico(s) y ${WARNINGS} advertencia(s)."
-    echo ""
-    print_info "Acciones requeridas:"
-    if [ $ERRORS -gt 0 ]; then
-        print_info "- Resolver errores críticos antes de continuar"
-        print_info "- Instalar herramientas faltantes"
-        print_info "- Verificar recursos de hardware"
+# Espacio en disco
+if command -v df &> /dev/null; then
+    DISK_SPACE=$(df -BG . 2>/dev/null | awk 'NR==2 {print $4}' | sed 's/G//' || echo "unknown")
+    if [ "$DISK_SPACE" != "unknown" ] && [ $DISK_SPACE -ge 20 ]; then
+        echo -e "${GREEN}✅ Disco: ${DISK_SPACE}GB disponibles (mínimo: 20GB)${NC}"
+    elif [ "$DISK_SPACE" != "unknown" ]; then
+        echo -e "${RED}❌ Disco: ${DISK_SPACE}GB disponibles (mínimo requerido: 20GB)${NC}"
+        TOOLS_OK=false
+    else
+        echo -e "${YELLOW}⚠️  No se puede verificar espacio en disco${NC}"
     fi
-    echo ""
-    print_info "Para instalar herramientas faltantes, ejecutar:"
-    print_info "  ./scripts/setup/install-minikube.sh"
+fi
+
+# Verificar Docker daemon
+echo -e "\n${YELLOW}🐳 Verificando Docker:${NC}"
+if docker ps &> /dev/null; then
+    echo -e "${GREEN}✅ Docker daemon: Funcionando correctamente${NC}"
+    
+    # Verificar permisos de Docker
+    if docker info &> /dev/null; then
+        echo -e "${GREEN}✅ Docker permisos: OK${NC}"
+    else
+        echo -e "${YELLOW}⚠️  Docker permisos: Puede requerir sudo${NC}"
+        echo -e "${CYAN}   Considera agregar tu usuario al grupo docker: sudo usermod -aG docker \$USER${NC}"
+    fi
+else
+    echo -e "${RED}❌ Docker daemon: No está corriendo${NC}"
+    echo -e "${CYAN}   Inicia Docker con: sudo systemctl start docker${NC}"
+    TOOLS_OK=false
+fi
+
+# Verificar herramientas opcionales
+echo -e "\n${YELLOW}🔧 Verificando herramientas opcionales:${NC}"
+
+if check_command "jq"; then
+    :
+else
+    echo -e "${YELLOW}⚠️  jq: Recomendado para procesamiento JSON${NC}"
+    echo -e "${CYAN}   Instalar: sudo apt-get install jq (Ubuntu) | brew install jq (macOS)${NC}"
+fi
+
+if check_command "yq"; then
+    :
+else
+    echo -e "${YELLOW}⚠️  yq: Recomendado para procesamiento YAML${NC}"
+    echo -e "${CYAN}   Instalar: sudo snap install yq | brew install yq${NC}"
+fi
+
+if check_command "minikube"; then
+    :
+else
+    echo -e "${YELLOW}⚠️  minikube: Se instalará automáticamente si es necesario${NC}"
+fi
+
+# Verificar conectividad de red
+echo -e "\n${YELLOW}🌐 Verificando conectividad:${NC}"
+if ping -c 1 google.com &> /dev/null; then
+    echo -e "${GREEN}✅ Conectividad a Internet: OK${NC}"
+else
+    echo -e "${YELLOW}⚠️  Conectividad a Internet: Limitada${NC}"
+    echo -e "${CYAN}   Algunas funcionalidades pueden requerir conexión a Internet${NC}"
+fi
+
+# Verificar puertos disponibles
+echo -e "\n${YELLOW}🔌 Verificando puertos requeridos:${NC}"
+REQUIRED_PORTS=(3000 8080 8081 8082)
+PORTS_OK=true
+
+for port in "${REQUIRED_PORTS[@]}"; do
+    if netstat -tuln 2>/dev/null | grep ":$port " &> /dev/null; then
+        echo -e "${YELLOW}⚠️  Puerto $port: En uso${NC}"
+        echo -e "${CYAN}   Puede causar conflictos. Considera liberar el puerto.${NC}"
+    else
+        echo -e "${GREEN}✅ Puerto $port: Disponible${NC}"
+    fi
+done
+
+# Resultado final
+echo -e "\n${BLUE}📊 Resumen de verificación:${NC}"
+
+if [ "$TOOLS_OK" = true ]; then
+    echo -e "${GREEN}🎉 ¡Todos los requisitos esenciales están cumplidos!${NC}"
+    echo -e "${GREEN}   Tu sistema está listo para ejecutar la plataforma${NC}"
+    echo
+    echo -e "${CYAN}📋 Próximos pasos:${NC}"
+    echo -e "${CYAN}   1. make minikube-setup     # Configurar cluster${NC}"
+    echo -e "${CYAN}   2. make deploy-demo        # Desplegar plataforma${NC}"
+    echo -e "${CYAN}   3. make port-forward       # Configurar acceso${NC}"
+    echo
+    echo -e "${BLUE}🚀 Comando rápido para empezar:${NC}"
+    echo -e "${CYAN}   make minikube-setup && make deploy-demo && make port-forward${NC}"
+    exit 0
+else
+    echo -e "${RED}❌ Algunos requisitos esenciales no están cumplidos${NC}"
+    echo -e "${YELLOW}   Instala las herramientas faltantes y vuelve a ejecutar este script${NC}"
+    
+    show_install_instructions
+    
+    echo -e "\n${CYAN}💡 Después de instalar las herramientas faltantes:${NC}"
+    echo -e "${CYAN}   ./scripts/setup/verify-requirements.sh${NC}"
     exit 1
 fi
