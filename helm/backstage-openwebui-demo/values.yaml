@@ -1,0 +1,240 @@
+# Backstage + OpenWebUI Demo - Umbrella Chart Values
+# Configuración optimizada para demo en Minikube
+
+# Configuración global compartida (usando variables del .env)
+global:
+  demo:
+    enabled: true
+    environment: "minikube"
+    resourceProfile: "minimal"
+  
+  database:
+    host: "${POSTGRES_HOST:-postgresql}"
+    port: "${POSTGRES_PORT:-5432}"
+    name: "${POSTGRES_DB:-backstage_openwebui}"
+    user: "${POSTGRES_USER:-backstage}"
+    password: "${POSTGRES_PASSWORD:-demo-backstage-password}"
+  
+  ingress:
+    className: "${INGRESS_CLASS_NAME:-nginx}"
+    domain: "${INGRESS_DOMAIN:-local}"
+    tls: "${INGRESS_TLS_ENABLED:-false}"
+
+# PostgreSQL - Base de datos compartida (usando variables del .env)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "${POSTGRES_PASSWORD:-demo-postgres-password}"
+    username: "${POSTGRES_USER:-backstage}"
+    password: "${POSTGRES_PASSWORD:-demo-backstage-password}"
+    database: "${POSTGRES_DB:-backstage_openwebui}"
+  
+  resources:
+    limits:
+      memory: "${POSTGRES_MEMORY_LIMIT:-256Mi}"
+      cpu: "${POSTGRES_CPU_LIMIT:-200m}"
+    requests:
+      memory: "${POSTGRES_MEMORY_REQUEST:-128Mi}"
+      cpu: "${POSTGRES_CPU_REQUEST:-100m}"
+  
+  persistence:
+    enabled: true
+    size: "${POSTGRESQL_STORAGE_SIZE:-2Gi}"
+  
+  commonLabels:
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    demo.minikube/component: database
+
+# Backstage - Developer Portal (usando variables del .env)
+backstage:
+  enabled: true
+  
+  image:
+    registry: "${BACKSTAGE_IMAGE_REGISTRY:-edissonz8809}"
+    repository: "${BACKSTAGE_IMAGE_REPOSITORY:-iaops/backstage}"
+    tag: "${BACKSTAGE_IMAGE_TAG:-demo-latest}"
+  
+  resources:
+    limits:
+      memory: "${BACKSTAGE_MEMORY_LIMIT:-512Mi}"
+      cpu: "${BACKSTAGE_CPU_LIMIT:-500m}"
+    requests:
+      memory: "${BACKSTAGE_MEMORY_REQUEST:-256Mi}"
+      cpu: "${BACKSTAGE_CPU_REQUEST:-200m}"
+  
+  global:
+    backstage:
+      appConfig:
+        app:
+          title: "${BACKSTAGE_APP_TITLE:-Backstage + OpenWebUI Demo}"
+          baseUrl: "${BACKSTAGE_BASE_URL:-http://backstage.local}"
+        backend:
+          baseUrl: "${BACKSTAGE_BACKEND_BASE_URL:-http://backstage.local:7007}"
+          cors:
+            origin: "${BACKSTAGE_BASE_URL:-http://backstage.local}"
+        database:
+          client: "${DATABASE_CLIENT:-pg}"
+          connection:
+            host: "${POSTGRES_HOST:-postgresql}"
+            port: "${POSTGRES_PORT:-5432}"
+            user: "${POSTGRES_USER:-backstage}"
+            database: "${POSTGRES_DB:-backstage_openwebui}"
+  
+  ingress:
+    enabled: true
+    className: "${INGRESS_CLASS_NAME:-nginx}"
+    hosts:
+      - host: "${BACKSTAGE_HOST:-backstage.local}"
+        paths:
+          - path: /
+            pathType: Prefix
+            service:
+              name: backstage
+              port: 3000
+  
+  auth:
+    enabled: "${BACKSTAGE_AUTH_ENABLED:-true}"
+    providers:
+      guest:
+        enabled: true
+      basic:
+        enabled: true
+        users:
+          - username: "${BACKSTAGE_DEMO_USER:-demo}"
+            password: "${BACKSTAGE_DEMO_PASSWORD:-demo123}"
+          - username: "${BACKSTAGE_ADMIN_USER:-admin}"
+            password: "${BACKSTAGE_ADMIN_PASSWORD:-admin123}"
+  
+  proxy:
+    enabled: true
+    endpoints:
+      "/api/openwebui":
+        target: "${PROXY_TARGET_OPENWEBUI:-http://openwebui:8080}"
+        changeOrigin: true
+        pathRewrite:
+          "${PROXY_PATH_REWRITE_OPENWEBUI:-^/api/openwebui}": ""
+  
+  plugins:
+    chat:
+      enabled: "${CHAT_PLUGIN_ENABLED:-true}"
+      openwebuiUrl: "${OPENWEBUI_BASE_URL:-http://openwebui:8080}"
+      title: "${CHAT_PLUGIN_TITLE:-AI Chat Assistant}"
+    techdocs:
+      enabled: "${TECHDOCS_ENABLED:-true}"
+  
+  catalog:
+    enabled: true
+  
+  postgresql:
+    enabled: false  # Usamos el PostgreSQL del umbrella chart
+  
+  commonLabels:
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    demo.minikube/component: frontend
+
+# OpenWebUI - AI Chat Interface (usando variables del .env)
+openwebui:
+  enabled: true
+  
+  image:
+    registry: "${OPENWEBUI_IMAGE_REGISTRY:-edissonz8809}"
+    repository: "${OPENWEBUI_IMAGE_REPOSITORY:-iaops/openwebui}"
+    tag: "${OPENWEBUI_IMAGE_TAG:-demo-latest}"
+  
+  resources:
+    limits:
+      memory: "${OPENWEBUI_MEMORY_LIMIT:-512Mi}"
+      cpu: "${OPENWEBUI_CPU_LIMIT:-500m}"
+    requests:
+      memory: "${OPENWEBUI_MEMORY_REQUEST:-256Mi}"
+      cpu: "${OPENWEBUI_CPU_REQUEST:-200m}"
+  
+  global:
+    openwebui:
+      baseUrl: "${OPENWEBUI_BASE_URL:-http://openwebui:8080}"
+      database:
+        type: "postgresql"
+        host: "${POSTGRES_HOST:-postgresql}"
+        port: "${POSTGRES_PORT:-5432}"
+        name: "${POSTGRES_DB:-backstage_openwebui}"
+        user: "${POSTGRES_USER:-backstage}"
+  
+  ingress:
+    enabled: true
+    className: "${INGRESS_CLASS_NAME:-nginx}"
+    hosts:
+      - host: "${OPENWEBUI_HOST:-openwebui.local}"
+        paths:
+          - path: /
+            pathType: Prefix
+  
+  database:
+    enabled: false  # Usamos el PostgreSQL del umbrella chart
+    type: "postgresql"
+    host: "${POSTGRES_HOST:-postgresql}"
+    port: "${POSTGRES_PORT:-5432}"
+    name: "${POSTGRES_DB:-backstage_openwebui}"
+    user: "${POSTGRES_USER:-backstage}"
+  
+  ai:
+    models:
+      default: "${OPENAI_DEFAULT_MODEL:-gpt-3.5-turbo}"
+      enabled:
+        - "${OPENAI_DEFAULT_MODEL:-gpt-3.5-turbo}"
+    providers:
+      openai:
+        enabled: true
+        apiKey: "${OPENAI_API_KEY:-}"  # Se configura via secret
+  
+  backstage:
+    integration:
+      enabled: true
+      webhookUrl: "${BACKSTAGE_BACKEND_BASE_URL:-http://backstage:7007}/api/webhooks/openwebui"
+      authToken: "${INTEGRATION_TOKEN:-demo-integration-token}"
+      features:
+        exportToDocs: true
+        catalogSync: true
+  
+  demo:
+    enabled: true
+    seedData: true
+    sampleChats: true
+    testUsers:
+      - username: "${OPENWEBUI_DEMO_USER:-demo}"
+        password: "${OPENWEBUI_DEMO_PASSWORD:-demo123}"
+        role: "admin"
+  
+  postgresql:
+    enabled: false  # Usamos el PostgreSQL del umbrella chart
+  
+  commonLabels:
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    demo.minikube/component: ai-chat
+
+# Configuración de red y seguridad
+networkPolicy:
+  enabled: false
+
+# Configuración de monitoreo (deshabilitada para demo)
+monitoring:
+  enabled: false
+  prometheus:
+    enabled: false
+  grafana:
+    enabled: false
+
+# Configuración de backup (deshabilitada para demo)
+backup:
+  enabled: false
+
+# Labels y annotations comunes
+commonLabels:
+  app.kubernetes.io/part-of: backstage-openwebui-demo
+  demo.minikube/optimized: "${DEMO_MINIKUBE_OPTIMIZED:-true}"
+  demo.minikube/version: "${DEMO_MINIKUBE_VERSION:-0.1.0}"
+
+commonAnnotations:
+  demo.minikube/resource-profile: "${DEMO_MINIKUBE_RESOURCE_PROFILE:-minimal}"
+  demo.minikube/total-memory: "${DEMO_MINIKUBE_TOTAL_MEMORY:-1.4Gi}"
+  demo.minikube/total-cpu: "${DEMO_MINIKUBE_TOTAL_CPU:-1.3}"
+  demo.minikube/setup-time: "${DEMO_MINIKUBE_SETUP_TIME:-5min}"

@@ -1,0 +1,184 @@
+# Configuración de Webhooks para Backstage
+# Permite enviar eventos de Backstage a OpenWebUI
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-webhook-config
+  namespace: backstage-demo
+  labels:
+    app.kubernetes.io/name: backstage-webhook
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: webhook
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Configuración de webhooks de Backstage"
+data:
+  # Configuración de webhooks en app-config.yaml
+  webhook-config.yaml: |
+    # Configuración de webhooks para integración con OpenWebUI
+    integrations:
+      openwebui:
+        webhook:
+          url: "http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000/api/webhooks/backstage"
+          secret: "${WEBHOOK_SECRET}"
+          events:
+            - "catalog.entity.created"
+            - "catalog.entity.updated"
+            - "catalog.entity.deleted"
+            - "catalog.location.created"
+            - "catalog.location.updated"
+            - "catalog.location.deleted"
+          headers:
+            Content-Type: "application/json"
+            User-Agent: "Backstage-Webhook/1.0"
+          timeout: 30
+          retries: 3
+          
+    # Configuración del catálogo para webhooks
+    catalog:
+      webhooks:
+        enabled: true
+        endpoints:
+          - name: "openwebui-integration"
+            url: "http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000/api/webhooks/backstage"
+            secret: "${WEBHOOK_SECRET}"
+            events:
+              - entity_created
+              - entity_updated
+              - entity_deleted
+            headers:
+              X-Webhook-Source: "backstage"
+              X-Webhook-Version: "1.0"
+
+  # Script de configuración de webhooks
+  setup-webhooks.js: |
+    // Script para configurar webhooks en Backstage
+    const { CatalogApi } = require('@backstage/catalog-client');
+    const { ConfigReader } = require('@backstage/config');
+    
+    class WebhookManager {
+      constructor(catalogApi, config) {
+        this.catalogApi = catalogApi;
+        this.config = config;
+        this.webhookUrl = config.getString('integrations.openwebui.webhook.url');
+        this.webhookSecret = config.getString('integrations.openwebui.webhook.secret');
+      }
+      
+      async sendWebhook(eventType, entity, user) {
+        const payload = {
+          event_type: eventType,
+          entity: entity,
+          user: user,
+          timestamp: new Date().toISOString(),
+          source: 'backstage'
+        };
+        
+        try {
+          const response = await fetch(this.webhookUrl, {
+            method: 'POST',
+            headers: {
+              'Content-Type': 'application/json',
+              'X-Webhook-Secret': this.webhookSecret,
+              'X-Webhook-Source': 'backstage',
+              'User-Agent': 'Backstage-Webhook/1.0'
+            },
+            body: JSON.stringify(payload)
+          });
+          
+          if (!response.ok) {
+            console.error(`Webhook failed: ${response.status} ${response.statusText}`);
+          } else {
+            console.log(`Webhook sent successfully for ${eventType}`);
+          }
+        } catch (error) {
+          console.error(`Webhook error: ${error.message}`);
+        }
+      }
+      
+      // Métodos para diferentes tipos de eventos
+      async onEntityCreated(entity, user) {
+        await this.sendWebhook('entity_created', entity, user);
+      }
+      
+      async onEntityUpdated(entity, user) {
+        await this.sendWebhook('entity_updated', entity, user);
+      }
+      
+      async onEntityDeleted(entity, user) {
+        await this.sendWebhook('entity_deleted', entity, user);
+      }
+    }
+    
+    module.exports = { WebhookManager };
+
+  # Configuración de procesador de eventos
+  event-processor.yaml: |
+    # Procesador de eventos para webhooks
+    events:
+      processors:
+        - name: "openwebui-webhook"
+          type: "webhook"
+          config:
+            url: "http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000/api/webhooks/backstage"
+            secret: "${WEBHOOK_SECRET}"
+            timeout: 30000
+            retries: 3
+            retry_delay: 5000
+            
+          # Filtros de eventos
+          filters:
+            - event_type: "catalog.*"
+              action: "send"
+            - event_type: "auth.*"
+              action: "ignore"
+            - event_type: "techdocs.*"
+              action: "send"
+              
+          # Transformaciones de payload
+          transforms:
+            - field: "entity.metadata.uid"
+              action: "remove"  # Remover información sensible
+            - field: "timestamp"
+              action: "add"
+              value: "${now}"
+            - field: "source"
+              action: "add"
+              value: "backstage"
+
+---
+# Secret para webhook
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backstage-webhook-secret
+  namespace: backstage-demo
+  labels:
+    app.kubernetes.io/name: backstage-webhook
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: webhook-secret
+type: Opaque
+data:
+  # webhook-secret: demo-webhook-secret-key (base64)
+  WEBHOOK_SECRET: ZGVtby13ZWJob29rLXNlY3JldC1rZXk=
+
+---
+# ServiceMonitor para métricas de webhooks (opcional)
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: backstage-webhook-metrics
+  namespace: backstage-demo
+  labels:
+    app.kubernetes.io/name: backstage-webhook
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: monitoring
+spec:
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: backstage
+  endpoints:
+  - port: http
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s

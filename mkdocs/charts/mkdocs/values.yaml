@@ -1,0 +1,252 @@
+# Valores por defecto para MkDocs Chart
+# Optimizado para demo en Minikube
+
+# Configuración de la imagen
+image:
+  repository: edissonz8809/iaops-mkdocs
+  tag: "latest"
+  pullPolicy: IfNotPresent
+
+# Configuración de recursos (optimizado para Minikube)
+resources:
+  requests:
+    memory: "128Mi"
+    cpu: "100m"
+  limits:
+    memory: "256Mi"
+    cpu: "200m"
+
+# Configuración de réplicas
+replicaCount: 1
+
+# Configuración del servicio
+service:
+  type: ClusterIP
+  port: 8000
+  targetPort: 8000
+  name: http
+
+# Configuración de ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    demo.minikube/optimized: "true"
+  hosts:
+    - host: docs.demo.local
+      paths:
+        - path: /
+          pathType: Prefix
+  tls: []
+
+# Configuración de volúmenes
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 1Gi
+  mountPath: /app/site
+
+# Configuración de ConfigMaps
+configMaps:
+  mkdocsConfig:
+    enabled: true
+    mountPath: /app/mkdocs.yml
+    subPath: mkdocs.yml
+  
+  processorConfig:
+    enabled: true
+    mountPath: /app/config
+  
+  templates:
+    enabled: true
+    mountPath: /app/templates
+
+# Configuración de Secrets
+secrets:
+  integrationTokens:
+    enabled: true
+    mountPath: /app/secrets
+
+# Variables de entorno
+env:
+  INTEGRATION_API_URL: "http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000"
+  BACKSTAGE_API_URL: "http://backstage.backstage-demo.svc.cluster.local:7007"
+  MKDOCS_CONFIG_FILE: "/app/mkdocs.yml"
+  DOCS_OUTPUT_PATH: "/app/docs-source"
+  SITE_OUTPUT_PATH: "/app/site"
+  PROCESSOR_SCHEDULE: "*/15 * * * *"  # Cada 15 minutos
+  LOG_LEVEL: "INFO"
+
+# Configuración de procesamiento automático
+processor:
+  enabled: true
+  schedule: "*/15 * * * *"  # CronJob cada 15 minutos
+  image:
+    repository: edissonz8809/iaops-mkdocs-processor
+    tag: "latest"
+    pullPolicy: IfNotPresent
+  resources:
+    requests:
+      memory: "128Mi"
+      cpu: "100m"
+    limits:
+      memory: "256Mi"
+      cpu: "200m"
+
+# Configuración de MkDocs
+mkdocs:
+  siteName: "Backstage-OpenWebUI Documentation Hub"
+  siteDescription: "Documentación automática generada desde conversaciones de chat"
+  siteUrl: "http://docs.demo.local"
+  theme: "material"
+  
+  # Plugins habilitados
+  plugins:
+    - search
+    - minify
+    - git-revision-date-localized
+    - awesome-pages
+    - macros
+    - mermaid2
+    - table-reader
+  
+  # Configuración del tema Material
+  materialTheme:
+    palette:
+      primary: "blue"
+      accent: "light blue"
+    features:
+      - navigation.tabs
+      - navigation.sections
+      - navigation.expand
+      - search.suggest
+      - search.highlight
+      - content.code.copy
+
+# Configuración de seguridad
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  capabilities:
+    drop:
+      - ALL
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+# Configuración de ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Configuración de autoscaling (deshabilitado para demo)
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 80
+  targetMemoryUtilizationPercentage: 80
+
+# Configuración de health checks
+healthChecks:
+  enabled: true
+  livenessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 30
+    periodSeconds: 10
+    timeoutSeconds: 5
+    failureThreshold: 3
+  
+  readinessProbe:
+    httpGet:
+      path: /
+      port: http
+    initialDelaySeconds: 10
+    periodSeconds: 5
+    timeoutSeconds: 3
+    failureThreshold: 3
+
+# Configuración de red
+networkPolicy:
+  enabled: true
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+        - namespaceSelector:
+            matchLabels:
+              name: integration-demo
+      ports:
+        - protocol: TCP
+          port: 8000
+  egress:
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+        - namespaceSelector:
+            matchLabels:
+              name: integration-demo
+      ports:
+        - protocol: TCP
+          port: 7007
+        - protocol: TCP
+          port: 8000
+    - to: {}  # Permitir acceso a internet para plugins
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+
+# Configuración de monitoreo
+monitoring:
+  enabled: false  # Deshabilitado para demo
+  serviceMonitor:
+    enabled: false
+    interval: 30s
+    path: /metrics
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  optimizeForMinikube: true
+  sampleData:
+    enabled: true
+    generateSampleConversations: false  # Usar datos reales
+  
+  # Configuración de desarrollo
+  development:
+    enabled: false
+    hotReload: false
+    debugMode: false
+
+# Configuración de backup (deshabilitado para demo)
+backup:
+  enabled: false
+  schedule: "0 2 * * *"
+  retention: 7
+
+# Tolerancias y afinidad de nodos (para demo en Minikube)
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Configuración de prioridad de pods
+priorityClassName: ""
+
+# Configuración de disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1

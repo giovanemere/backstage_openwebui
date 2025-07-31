@@ -1,0 +1,162 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-config
+  namespace: backstage-demo
+  labels:
+    app: backstage
+    component: config
+    demo.minikube: "true"
+data:
+  app-config.yaml: |
+    app:
+      title: Backstage Demo
+      baseUrl: http://backstage:7007
+      
+    organization:
+      name: Demo Organization
+      
+    backend:
+      baseUrl: http://backstage:7007
+      listen:
+        port: 7007
+        host: 0.0.0.0
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: http://localhost:3000
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: true
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: ${POSTGRES_DB}
+          ssl: false
+          
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+          
+    proxy:
+      '/openwebui':
+        target: 'http://openwebui:8080'
+        changeOrigin: true
+        headers:
+          Authorization: 'Bearer ${OPENWEBUI_TOKEN}'
+          
+    auth:
+      environment: development
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: true
+          
+    scaffolder:
+      defaultAuthor:
+        name: Demo User
+        email: demo@example.com
+        
+    catalog:
+      import:
+        entityFilename: catalog-info.yaml
+        pullRequestBranchName: backstage-integration
+      rules:
+        - allow: [Component, System, API, Resource, Location]
+      locations:
+        - type: file
+          target: ../../examples/entities.yaml
+          
+    techdocs:
+      builder: 'local'
+      generator:
+        runIn: 'local'
+      publisher:
+        type: 'local'
+        
+    kubernetes:
+      serviceLocatorMethod:
+        type: 'multiTenant'
+      clusterLocatorMethods:
+        - type: 'config'
+          clusters:
+            - url: https://kubernetes.default.svc.cluster.local
+              name: minikube-demo
+              authProvider: 'serviceAccount'
+              skipTLSVerify: true
+              skipMetricsLookup: false
+              
+  entities.yaml: |
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: backstage-demo
+      description: Backstage demo application
+      annotations:
+        github.com/project-slug: edissonz8809/iaops
+        backstage.io/kubernetes-id: backstage
+    spec:
+      type: website
+      lifecycle: experimental
+      owner: demo-team
+      system: demo-system
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: openwebui-demo
+      description: OpenWebUI chat application
+      annotations:
+        github.com/project-slug: edissonz8809/iaops
+        backstage.io/kubernetes-id: openwebui
+    spec:
+      type: service
+      lifecycle: experimental
+      owner: demo-team
+      system: demo-system
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: System
+    metadata:
+      name: demo-system
+      description: Demo system for Backstage + OpenWebUI
+    spec:
+      owner: demo-team
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Group
+    metadata:
+      name: demo-team
+      description: Demo team
+    spec:
+      type: team
+      children: []
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-plugins
+  namespace: backstage-demo
+  labels:
+    app: backstage
+    component: plugins
+    demo.minikube: "true"
+data:
+  plugins.yaml: |
+    plugins:
+      - name: '@backstage/plugin-kubernetes'
+        version: latest
+      - name: '@backstage/plugin-techdocs'
+        version: latest
+      - name: '@backstage/plugin-catalog-import'
+        version: latest
+      - name: '@backstage/plugin-scaffolder'
+        version: latest
+      - name: '@backstage/plugin-search'
+        version: latest
+      - name: '@backstage/plugin-user-settings'
+        version: latest

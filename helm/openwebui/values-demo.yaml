@@ -1,0 +1,158 @@
+# OpenWebUI Helm Chart Values - Demo Environment
+# Configuración optimizada para demo en Minikube
+
+# Configuración de réplicas (demo)
+replicaCount: 1
+
+# Configuración de recursos (optimizada para Minikube)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Autoscaling básico para demo
+autoscaling:
+  enabled: true
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Configuración de Ingress para demo
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: openwebui.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: openwebui
+          port: 80
+        - path: /api
+          pathType: Prefix
+          service: openwebui-api
+          port: 8080
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "http://backstage.local"
+
+# Configuración de almacenamiento (demo)
+persistence:
+  enabled: true
+  size: 2Gi
+  models:
+    enabled: true
+    size: 1Gi
+
+# Configuración de OpenWebUI para demo
+openwebui:
+  name: "OpenWebUI Demo"
+  auth:
+    enabled: true
+    enableSignup: true
+    defaultUserRole: "user"
+  features:
+    chat: true
+    fileUpload: true
+    codeExecution: false  # Deshabilitado para demo
+    webSearch: false      # Deshabilitado para demo
+    imageGeneration: false
+  upload:
+    maxFileSize: "10485760"  # 10MB
+  ai:
+    providers:
+      ollama:
+        enabled: true
+        baseUrl: "http://ollama:11434"
+        models: ["llama2", "codellama"]
+      openai:
+        enabled: false  # Deshabilitado por defecto en demo
+  backstage:
+    enabled: true
+    baseUrl: "http://backstage.backstage-demo.svc.cluster.local:7007"
+
+# Configuración de PostgreSQL para demo
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "demo-postgres-123"
+    username: "openwebui"
+    password: "openwebui123"
+    database: "openwebui"
+  primary:
+    resources:
+      limits:
+        cpu: 300m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Network policies habilitadas pero permisivas
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    enabled: true
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      - namespaceSelector:
+          matchLabels:
+            name: backstage-demo
+      - namespaceSelector: {}  # Permisivo para demo
+
+# Configuración de logging para demo
+logging:
+  level: "INFO"
+  format: "json"
+
+# Sidecars habilitados para demo
+sidecars:
+  nginx:
+    enabled: true
+
+# Labels específicos para demo
+commonLabels:
+  environment: demo
+  demo.minikube: "true"
+  app.kubernetes.io/part-of: backstage-openwebui-demo
+
+commonAnnotations:
+  demo.minikube/environment: "demo"
+  demo.minikube/optimized: "true"
+  demo.minikube/memory-total: "768Mi"
+  demo.minikube/cpu-total: "800m"
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  minikube:
+    optimized: true
+    resourceLimits: true
+    networkPolicies: permissive
+  backstageIntegration:
+    enabled: true
+    crossNamespace: true
+  sampleData:
+    enabled: true
+    users:
+      - email: "demo@example.com"
+        password: "demo123"
+        role: "admin"
+      - email: "user@example.com"
+        password: "user123"
+        role: "user"

@@ -1,0 +1,208 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openwebui.fullname" . }}-config
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: config
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+data:
+  config.yaml: |
+    app:
+      name: {{ .Values.openwebui.name | quote }}
+      description: "AI Chat Interface integrated with Backstage"
+      version: {{ .Chart.AppVersion | quote }}
+      
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      cors:
+        enabled: true
+        origins:
+          - "http://localhost"
+          {{- if .Values.openwebui.backstage.enabled }}
+          - {{ .Values.openwebui.backstage.baseUrl | quote }}
+          {{- end }}
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        headers: ["Content-Type", "Authorization", "X-Requested-With"]
+        
+    database:
+      type: {{ .Values.database.type | quote }}
+      host: {{ .Values.database.host | quote }}
+      port: {{ .Values.database.port }}
+      name: {{ .Values.database.name | quote }}
+      user: {{ .Values.database.user | quote }}
+      ssl_mode: {{ .Values.database.sslMode | default "disable" | quote }}
+      
+    auth:
+      enabled: {{ .Values.openwebui.auth.enabled }}
+      default_user: "demo@example.com"
+      default_password: "demo123"
+      session_timeout: 3600
+      
+    ai:
+      providers:
+        {{- if .Values.openwebui.ai.providers.ollama.enabled }}
+        - name: "ollama"
+          type: "ollama"
+          base_url: {{ .Values.openwebui.ai.providers.ollama.baseUrl | quote }}
+          enabled: true
+          models:
+            {{- range .Values.openwebui.ai.providers.ollama.models }}
+            - {{ . | quote }}
+            {{- end }}
+        {{- end }}
+        {{- if .Values.openwebui.ai.providers.openai.enabled }}
+        - name: "openai"
+          type: "openai"
+          enabled: true
+          models:
+            {{- range .Values.openwebui.ai.providers.openai.models }}
+            - {{ . | quote }}
+            {{- end }}
+        {{- end }}
+            
+    features:
+      chat: {{ .Values.openwebui.features.chat }}
+      file_upload: {{ .Values.openwebui.features.fileUpload }}
+      code_execution: {{ .Values.openwebui.features.codeExecution }}
+      web_search: {{ .Values.openwebui.features.webSearch }}
+      image_generation: {{ .Values.openwebui.features.imageGeneration }}
+      
+    {{- if .Values.openwebui.backstage.enabled }}
+    integrations:
+      backstage:
+        enabled: true
+        base_url: {{ .Values.openwebui.backstage.baseUrl | quote }}
+        webhook_url: {{ .Values.openwebui.backstage.webhookUrl | default "/api/webhooks/backstage" | quote }}
+    {{- end }}
+        
+    storage:
+      type: "local"
+      path: "/app/data"
+      max_file_size: {{ .Values.openwebui.upload.maxFileSize | quote }}
+      allowed_extensions:
+        {{- range .Values.openwebui.upload.allowedExtensions }}
+        - {{ . | quote }}
+        {{- end }}
+      
+    logging:
+      level: {{ .Values.logging.level | quote }}
+      format: {{ .Values.logging.format | quote }}
+      file: "/app/logs/openwebui.log"
+      
+    security:
+      rate_limit:
+        enabled: true
+        requests_per_minute: 60
+      content_filter:
+        enabled: true
+        blocked_words: []
+
+  {{- if .Values.sidecars.nginx.enabled }}
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream openwebui {
+            server localhost:8080;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            client_max_body_size 50M;
+            
+            {{- if .Values.openwebui.backstage.enabled }}
+            location /api/backstage/ {
+                proxy_pass {{ .Values.openwebui.backstage.baseUrl }}/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            {{- end }}
+            
+            location / {
+                proxy_pass http://openwebui;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+            
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+        }
+    }
+  {{- end }}
+
+---
+{{- if .Values.sidecars.nginx.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "openwebui.fullname" . }}-nginx
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: nginx-config
+data:
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream openwebui {
+            server localhost:8080;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            client_max_body_size 50M;
+            
+            {{- if .Values.openwebui.backstage.enabled }}
+            location /api/backstage/ {
+                proxy_pass {{ .Values.openwebui.backstage.baseUrl }}/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            {{- end }}
+            
+            location / {
+                proxy_pass http://openwebui;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+            
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+        }
+    }
+{{- end }}

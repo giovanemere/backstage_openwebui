@@ -1,0 +1,156 @@
+# Backstage-OpenWebUI Documentation Hub
+
+¡Bienvenido al hub de documentación automática generado desde las conversaciones de chat y entidades del catálogo de Backstage!
+
+## 📊 Estadísticas Generales
+
+<div class="grid cards" markdown>
+
+-   :material-chat: **Conversaciones Totales**
+
+    ---
+
+    **{{ total_sessions }}** sesiones de chat procesadas
+
+-   :material-message: **Mensajes Procesados**
+
+    ---
+
+    **{{ total_messages }}** mensajes analizados
+
+-   :material-database: **Entidades con Conversaciones**
+
+    ---
+
+    **{{ entities_with_conversations }}** entidades del catálogo tienen conversaciones asociadas
+
+-   :material-clock: **Última Actualización**
+
+    ---
+
+    {{ generated_at.strftime('%d/%m/%Y %H:%M') }}
+
+</div>
+
+## 🚀 Características Principales
+
+### Chat Contextual Inteligente
+- **Conversaciones por Entidad**: Cada componente, API o recurso puede tener conversaciones específicas
+- **Contexto Automático**: El chat conoce automáticamente los metadatos y especificaciones de las entidades
+- **Historial Persistente**: Todas las conversaciones se almacenan y están disponibles para consulta
+
+### Documentación Automática
+- **Generación Dinámica**: La documentación se actualiza automáticamente basada en las conversaciones
+- **Insights Inteligentes**: Análisis automático de patrones y temas en las conversaciones
+- **Integración con TechDocs**: Compatible con el sistema de documentación de Backstage
+
+### Análisis y Métricas
+- **Patrones de Uso**: Identificación de las entidades más consultadas
+- **Temas Frecuentes**: Análisis de los temas más discutidos
+- **Tendencias Temporales**: Evolución de las conversaciones a lo largo del tiempo
+
+## 📈 Conversaciones Recientes
+
+{% if recent_sessions %}
+| Título | Entidad | Tipo | Fecha |
+|--------|---------|------|-------|
+{% for session in recent_sessions %}
+| {{ session[0] }} | {{ session[1] or 'N/A' }} | {{ session[2] or 'General' }} | {{ session[3][:10] if session[3] else 'N/A' }} |
+{% endfor %}
+{% else %}
+*No hay conversaciones recientes disponibles*
+{% endif %}
+
+## 🗂️ Navegación Rápida
+
+### Por Tipo de Contenido
+
+=== "Conversaciones"
+
+    - [📋 Resúmenes de Conversaciones](conversations/summaries.md) - Vista general de todas las sesiones de chat
+    - [🏷️ Por Entidad](conversations/by-entity.md) - Conversaciones organizadas por componente/API/recurso
+    - [🔍 Análisis e Insights](conversations/analysis.md) - Patrones y tendencias identificadas
+    - [💡 Insights Generales](conversations/insights.md) - Conclusiones y aprendizajes
+
+=== "Catálogo"
+
+    - [🧩 Componentes](catalog/components.md) - Documentación de componentes con conversaciones
+    - [🔌 APIs](catalog/apis.md) - Documentación de APIs con contexto de chat
+    - [💾 Recursos](catalog/resources.md) - Recursos de infraestructura documentados
+    - [🏗️ Sistemas](catalog/systems.md) - Sistemas y arquitecturas
+    - [🌐 Dominios](catalog/domains.md) - Dominios de negocio
+
+=== "Contenido Generado"
+
+    - [📝 Documentación](generated/documentation.md) - Documentación generada automáticamente
+    - [📄 README Files](generated/readmes.md) - READMEs creados por IA
+    - [📋 Plantillas](generated/templates.md) - Plantillas utilizadas para generación
+    - [✨ Enriquecimientos](generated/enrichments.md) - Mejoras automáticas de entidades
+
+=== "Guías"
+
+    - [🚀 Inicio Rápido](guides/quick-start.md) - Cómo empezar a usar el sistema
+    - [💬 Chat Contextual](guides/contextual-chat.md) - Guía del chat inteligente
+    - [🎨 Generación de Contenido](guides/content-generation.md) - Crear contenido con IA
+    - [🔧 Troubleshooting](guides/troubleshooting.md) - Solución de problemas
+
+## 🔧 Integración Técnica
+
+### APIs Disponibles
+
+- **Integration API**: Comunicación entre Backstage y OpenWebUI
+- **Webhook System**: Eventos en tiempo real entre servicios
+- **Catalog API**: Acceso a entidades del catálogo de Backstage
+
+### Arquitectura
+
+```mermaid
+graph TB
+    A[Backstage] --> B[Integration API]
+    B --> C[OpenWebUI]
+    C --> D[Chat Sessions]
+    D --> E[MkDocs Processor]
+    E --> F[Documentation Site]
+    
+    G[Catalog Entities] --> B
+    H[Webhooks] --> B
+    I[Generated Content] --> E
+    
+    style A fill:#1976d2,stroke:#1976d2,color:#fff
+    style C fill:#ff9800,stroke:#ff9800,color:#fff
+    style F fill:#4caf50,stroke:#4caf50,color:#fff
+```
+
+## 📚 Recursos Adicionales
+
+### Documentación Técnica
+- [API Reference](api/endpoints.md) - Documentación completa de endpoints
+- [Webhooks](api/webhooks.md) - Sistema de eventos y notificaciones
+- [Autenticación](api/authentication.md) - Configuración de seguridad
+
+### Despliegue y Configuración
+- [Minikube Setup](deployment/minikube.md) - Configuración para desarrollo local
+- [Kubernetes](deployment/kubernetes.md) - Despliegue en producción
+- [Configuración](deployment/configuration.md) - Parámetros y variables
+- [Monitoreo](deployment/monitoring.md) - Observabilidad y métricas
+
+## 🎯 Próximos Pasos
+
+1. **Explora las Conversaciones**: Revisa las [conversaciones por entidad](conversations/by-entity.md) para ver cómo se usa el sistema
+2. **Consulta los Insights**: Analiza los [patrones identificados](conversations/insights.md) para entender tendencias
+3. **Usa el Chat**: Inicia conversaciones contextuales desde Backstage
+4. **Genera Contenido**: Utiliza las funcionalidades de IA para crear documentación
+
+---
+
+!!! tip "Documentación Viva"
+    Esta documentación se actualiza automáticamente cada vez que se procesan nuevas conversaciones. 
+    La información siempre refleja el estado actual del sistema.
+
+!!! info "Feedback"
+    ¿Encontraste algo útil o tienes sugerencias? Las conversaciones de chat son la mejor forma de 
+    mejorar continuamente esta documentación.
+
+---
+
+*Documentación generada automáticamente el {{ generated_at.strftime('%d de %B de %Y a las %H:%M') }}*

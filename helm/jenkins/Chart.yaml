@@ -1,0 +1,24 @@
+apiVersion: v2
+name: jenkins
+description: Jenkins optimizado para demo Backstage + OpenWebUI en Minikube
+type: application
+version: 0.1.0
+appVersion: "2.426.1"
+home: https://github.com/edissonz8809/iaops
+sources:
+  - https://github.com/edissonz8809/iaops
+maintainers:
+  - name: Amazon Q
+    email: demo@example.com
+keywords:
+  - jenkins
+  - ci-cd
+  - demo
+  - minikube
+  - backstage
+  - openwebui
+annotations:
+  demo.minikube/optimized: "true"
+  demo.minikube/memory-limit: "512Mi"
+  demo.minikube/cpu-limit: "500m"
+  demo.minikube/features: "kubernetes-integration,docker-builds,helm-support"

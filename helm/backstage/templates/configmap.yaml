@@ -1,0 +1,170 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "backstage.fullname" . }}-config
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-config
+data:
+  app-config.yaml: |
+    app:
+      title: {{ .Values.backstage.app.title | quote }}
+      baseUrl: {{ .Values.backstage.app.baseUrl | quote }}
+      
+    organization:
+      name: {{ .Values.backstage.organization.name | quote }}
+      
+    backend:
+      baseUrl: {{ .Values.backstage.backend.baseUrl | quote }}
+      listen:
+        port: {{ .Values.backstage.backend.listen.port }}
+        host: {{ .Values.backstage.backend.listen.host | quote }}
+      csp:
+        connect-src: ["'self'", 'http:', 'https:']
+      cors:
+        origin: {{ .Values.backstage.backend.cors.origin | quote }}
+        methods: [GET, HEAD, PATCH, POST, PUT, DELETE]
+        credentials: {{ .Values.backstage.backend.cors.credentials }}
+      database:
+        client: pg
+        connection:
+          host: ${POSTGRES_HOST}
+          port: ${POSTGRES_PORT}
+          user: ${POSTGRES_USER}
+          password: ${POSTGRES_PASSWORD}
+          database: ${POSTGRES_DB}
+          ssl: false
+          
+    integrations:
+      github:
+        - host: github.com
+          token: ${GITHUB_TOKEN}
+          
+    {{- if .Values.openwebui.enabled }}
+    proxy:
+      '/openwebui':
+        target: {{ .Values.openwebui.url | quote }}
+        changeOrigin: true
+        {{- if .Values.openwebui.integration.enabled }}
+        headers:
+          Authorization: 'Bearer ${OPENWEBUI_TOKEN}'
+        {{- end }}
+    {{- end }}
+          
+    auth:
+      environment: {{ .Values.backstage.auth.environment | quote }}
+      providers:
+        guest:
+          dangerouslyAllowOutsideDevelopment: {{ .Values.backstage.auth.providers.guest.dangerouslyAllowOutsideDevelopment }}
+          
+    scaffolder:
+      defaultAuthor:
+        name: {{ .Values.backstage.scaffolder.defaultAuthor.name | quote }}
+        email: {{ .Values.backstage.scaffolder.defaultAuthor.email | quote }}
+        
+    catalog:
+      import:
+        entityFilename: {{ .Values.backstage.catalog.import.entityFilename | quote }}
+        pullRequestBranchName: {{ .Values.backstage.catalog.import.pullRequestBranchName | quote }}
+      rules:
+        {{- range .Values.backstage.catalog.rules }}
+        - allow: {{ . | toYaml | nindent 10 }}
+        {{- end }}
+      locations:
+        - type: file
+          target: ../../examples/entities.yaml
+          
+    techdocs:
+      builder: {{ .Values.backstage.techdocs.builder | quote }}
+      generator:
+        runIn: {{ .Values.backstage.techdocs.generator.runIn | quote }}
+      publisher:
+        type: {{ .Values.backstage.techdocs.publisher.type | quote }}
+        
+    {{- if .Values.kubernetes.enabled }}
+    kubernetes:
+      serviceLocatorMethod:
+        type: {{ .Values.kubernetes.serviceLocatorMethod.type | quote }}
+      clusterLocatorMethods:
+        {{- range .Values.kubernetes.clusterLocatorMethods }}
+        - type: {{ .type | quote }}
+          clusters:
+            {{- range .clusters }}
+            - url: {{ .url | quote }}
+              name: {{ .name | quote }}
+              authProvider: {{ .authProvider | quote }}
+              skipTLSVerify: {{ .skipTLSVerify }}
+              skipMetricsLookup: {{ .skipMetricsLookup }}
+            {{- end }}
+        {{- end }}
+    {{- end }}
+
+  entities.yaml: |
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: backstage-demo
+      description: Backstage demo application
+      annotations:
+        github.com/project-slug: edissonz8809/iaops
+        backstage.io/kubernetes-id: backstage
+    spec:
+      type: website
+      lifecycle: experimental
+      owner: demo-team
+      system: demo-system
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Component
+    metadata:
+      name: openwebui-demo
+      description: OpenWebUI chat application
+      annotations:
+        github.com/project-slug: edissonz8809/iaops
+        backstage.io/kubernetes-id: openwebui
+    spec:
+      type: service
+      lifecycle: experimental
+      owner: demo-team
+      system: demo-system
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: System
+    metadata:
+      name: demo-system
+      description: Demo system for Backstage + OpenWebUI
+    spec:
+      owner: demo-team
+    ---
+    apiVersion: backstage.io/v1alpha1
+    kind: Group
+    metadata:
+      name: demo-team
+      description: Demo team
+    spec:
+      type: team
+      children: []
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "backstage.fullname" . }}-plugins
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-plugins
+data:
+  plugins.yaml: |
+    plugins:
+      - name: '@backstage/plugin-kubernetes'
+        version: latest
+      - name: '@backstage/plugin-techdocs'
+        version: latest
+      - name: '@backstage/plugin-catalog-import'
+        version: latest
+      - name: '@backstage/plugin-scaffolder'
+        version: latest
+      - name: '@backstage/plugin-search'
+        version: latest
+      - name: '@backstage/plugin-user-settings'
+        version: latest

@@ -1,0 +1,273 @@
+# Servicio de Integración Backstage-OpenWebUI
+# Deployment y Service para la API de integración
+
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: backstage-openwebui-integration
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-api
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    app.kubernetes.io/component: integration
+    integration.demo/service: api
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "API de integración entre Backstage y OpenWebUI"
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: integration-api
+  template:
+    metadata:
+      labels:
+        app.kubernetes.io/name: integration-api
+        app.kubernetes.io/part-of: backstage-openwebui-demo
+        app.kubernetes.io/component: integration
+        integration.demo/service: api
+      annotations:
+        demo.minikube/optimized: "true"
+    spec:
+      containers:
+      - name: integration-api
+        image: python:3.11-slim
+        ports:
+        - containerPort: 8000
+          name: http
+          protocol: TCP
+        env:
+        - name: BACKSTAGE_BASE_URL
+          value: "http://backstage.backstage-demo.svc.cluster.local:7007"
+        - name: OPENWEBUI_BASE_URL
+          value: "http://openwebui.openwebui-demo.svc.cluster.local:8080"
+        - name: INTEGRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: backstage-openwebui-integration-secrets
+              key: INTEGRATION_JWT_SECRET
+        - name: WEBHOOK_SECRET
+          valueFrom:
+            secretKeyRef:
+              name: backstage-openwebui-integration-secrets
+              key: WEBHOOK_SECRET
+        - name: PYTHONPATH
+          value: "/app"
+        volumeMounts:
+        - name: api-code
+          mountPath: /app
+        - name: config
+          mountPath: /app/config
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Installing dependencies..."
+          pip install fastapi uvicorn httpx pydantic python-multipart
+          echo "Starting integration API..."
+          cd /app
+          python openwebui-integration-api.py
+        resources:
+          requests:
+            memory: "256Mi"
+            cpu: "100m"
+          limits:
+            memory: "512Mi"
+            cpu: "500m"
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /health
+            port: 8000
+          initialDelaySeconds: 10
+          periodSeconds: 5
+          timeoutSeconds: 3
+          failureThreshold: 3
+      volumes:
+      - name: api-code
+        configMap:
+          name: integration-api-code
+      - name: config
+        configMap:
+          name: backstage-openwebui-integration
+      restartPolicy: Always
+
+---
+# ConfigMap con el código de la API
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: integration-api-code
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-api-code
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: code
+data:
+  openwebui-integration-api.py: |
+    #!/usr/bin/env python3
+    """
+    API de Integración OpenWebUI-Backstage (Versión simplificada para demo)
+    """
+    
+    from fastapi import FastAPI, HTTPException, Header
+    from fastapi.middleware.cors import CORSMiddleware
+    from pydantic import BaseModel
+    from typing import List, Optional, Dict, Any
+    from datetime import datetime
+    import uuid
+    import json
+    import os
+    import logging
+    
+    # Configuración de logging
+    logging.basicConfig(level=logging.INFO)
+    logger = logging.getLogger(__name__)
+    
+    # Modelos básicos
+    class HealthResponse(BaseModel):
+        status: str
+        timestamp: datetime
+        services: Dict[str, str]
+    
+    class ChatMessage(BaseModel):
+        id: str
+        role: str
+        content: str
+        timestamp: datetime
+    
+    class ChatSession(BaseModel):
+        id: str
+        title: str
+        messages: List[ChatMessage] = []
+        created_at: datetime
+    
+    # Crear aplicación
+    app = FastAPI(
+        title="OpenWebUI-Backstage Integration API",
+        description="API simplificada para demo de integración",
+        version="1.0.0"
+    )
+    
+    # CORS
+    app.add_middleware(
+        CORSMiddleware,
+        allow_origins=["*"],
+        allow_credentials=True,
+        allow_methods=["*"],
+        allow_headers=["*"],
+    )
+    
+    # Storage en memoria
+    sessions = {}
+    
+    @app.get("/health", response_model=HealthResponse)
+    async def health_check():
+        """Health check endpoint"""
+        return HealthResponse(
+            status="ok",
+            timestamp=datetime.now(),
+            services={
+                "integration-api": "ok",
+                "backstage": "ok",
+                "openwebui": "ok"
+            }
+        )
+    
+    @app.post("/api/chat/start")
+    async def start_chat():
+        """Iniciar chat (demo)"""
+        session_id = str(uuid.uuid4())
+        session = ChatSession(
+            id=session_id,
+            title="Demo Chat Session",
+            created_at=datetime.now()
+        )
+        sessions[session_id] = session
+        return session
+    
+    @app.get("/api/chat/history")
+    async def get_history():
+        """Obtener historial (demo)"""
+        return list(sessions.values())
+    
+    @app.get("/api/models")
+    async def get_models():
+        """Obtener modelos (demo)"""
+        return [
+            {
+                "id": "demo-model",
+                "name": "Demo Model",
+                "capabilities": ["chat", "generation"]
+            }
+        ]
+    
+    @app.post("/api/webhooks/backstage")
+    async def backstage_webhook(request: Dict[str, Any]):
+        """Webhook de Backstage (demo)"""
+        logger.info(f"Received webhook: {request}")
+        return {"status": "processed"}
+    
+    if __name__ == "__main__":
+        import uvicorn
+        uvicorn.run(app, host="0.0.0.0", port=8000)
+
+---
+# Service para exponer la API
+apiVersion: v1
+kind: Service
+metadata:
+  name: backstage-openwebui-integration
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-api
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    app.kubernetes.io/component: integration
+    integration.demo/service: api
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Servicio de API de integración"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 8000
+    targetPort: 8000
+    protocol: TCP
+    name: http
+  selector:
+    app.kubernetes.io/name: integration-api
+
+---
+# Ingress para acceso externo (opcional)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: backstage-openwebui-integration
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-api
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: ingress
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Ingress para API de integración"
+spec:
+  rules:
+  - host: integration-api.demo.local
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: backstage-openwebui-integration
+            port:
+              number: 8000

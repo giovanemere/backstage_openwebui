@@ -1,0 +1,52 @@
+# Jenkins Plugins - Optimizado para Demo Minikube
+# Plugins esenciales para CI/CD básico
+
+# Core plugins
+ant:475.vf34069fef73c
+build-timeout:1.31
+credentials-binding:681.vf91669a_32e45
+timestamper:1.26
+ws-cleanup:0.45
+gradle:2.8.2
+
+# SCM plugins
+git:5.0.0
+github:1.37.3.1
+github-branch-source:1703.vd5a_2b_29c6cdc
+
+# Pipeline plugins
+workflow-aggregator:596.v8c21c963d92d
+pipeline-stage-view:2.32
+pipeline-graph-analysis:216.vfd8b_ece330ca_
+
+# Docker integration
+docker-workflow:563.vd5d2e5c4007f
+docker-plugin:1.5
+
+# Kubernetes integration
+kubernetes:4029.v5712230ccb_f8
+kubernetes-cli:1.12.1
+
+# Build tools
+maven-plugin:3.22
+nodejs:1.6.1
+
+# Notifications
+mailer:463.vedf8358e006b_
+email-ext:2.102
+
+# Security
+matrix-auth:3.2.1
+role-strategy:689.v731678c3e0eb_
+
+# Utilities
+configuration-as-code:1670.v564dc8b_982d0
+job-dsl:1.87
+build-name-setter:2.4.1
+description-setter:1.10
+environment-injector:2.4.0
+
+# Demo specific
+blueocean:1.27.4
+dashboard-view:2.491.v9c2f8b_f3b_73b_
+simple-theme-plugin:183.va_0c6052a_0b_a_7

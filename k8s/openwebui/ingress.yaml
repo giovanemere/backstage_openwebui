@@ -1,0 +1,104 @@
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openwebui-ingress
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: ingress
+    demo.minikube: "true"
+    app.kubernetes.io/name: openwebui-ingress
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+  annotations:
+    # Nginx Ingress Controller annotations
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    
+    # Configuraciones específicas para OpenWebUI
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-send-timeout: "300"
+    nginx.ingress.kubernetes.io/proxy-connect-timeout: "300"
+    
+    # WebSocket support
+    nginx.ingress.kubernetes.io/proxy-http-version: "1.1"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Upgrade $http_upgrade;
+      proxy_set_header Connection "upgrade";
+      proxy_set_header Host $host;
+      proxy_set_header X-Real-IP $remote_addr;
+      proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+      proxy_set_header X-Forwarded-Proto $scheme;
+    
+    # CORS para integración con Backstage
+    nginx.ingress.kubernetes.io/cors-allow-origin: "http://backstage.local, http://localhost:3000, http://localhost:7007"
+    nginx.ingress.kubernetes.io/cors-allow-methods: "GET, POST, PUT, DELETE, OPTIONS"
+    nginx.ingress.kubernetes.io/cors-allow-headers: "DNT,User-Agent,X-Requested-With,If-Modified-Since,Cache-Control,Content-Type,Range,Authorization"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    
+    # Optimizaciones para demo
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Ingress para OpenWebUI con soporte WebSocket y CORS"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: openwebui.local
+      http:
+        paths:
+          - path: /
+            pathType: Prefix
+            backend:
+              service:
+                name: openwebui
+                port:
+                  number: 80
+          - path: /api
+            pathType: Prefix
+            backend:
+              service:
+                name: openwebui-api
+                port:
+                  number: 8080
+    # Regla adicional para acceso directo por IP (útil para Minikube)
+    - http:
+        paths:
+          - path: /openwebui
+            pathType: Prefix
+            backend:
+              service:
+                name: openwebui
+                port:
+                  number: 80
+
+---
+# Ingress adicional para API específica (separación de concerns)
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: openwebui-api-ingress
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: api-ingress
+    demo.minikube: "true"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/backend-protocol: "HTTP"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    demo.minikube/description: "Ingress específico para API de OpenWebUI"
+spec:
+  ingressClassName: nginx
+  rules:
+    - host: api.openwebui.local
+      http:
+        paths:
+          - path: /v1(/|$)(.*)
+            pathType: Prefix
+            backend:
+              service:
+                name: openwebui-api
+                port:
+                  number: 8080

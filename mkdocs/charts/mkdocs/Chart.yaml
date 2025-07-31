@@ -1,0 +1,24 @@
+apiVersion: v2
+name: mkdocs
+description: MkDocs para documentación automática de conversaciones Backstage-OpenWebUI
+type: application
+version: 0.1.0
+appVersion: "1.5.3"
+home: https://github.com/edissonz8809/iaops
+sources:
+  - https://github.com/edissonz8809/iaops
+maintainers:
+  - name: Amazon Q
+    email: demo@example.com
+keywords:
+  - mkdocs
+  - documentation
+  - backstage
+  - openwebui
+  - demo
+  - minikube
+annotations:
+  demo.minikube/optimized: "true"
+  demo.minikube/description: "MkDocs optimizado para demo con procesamiento de conversaciones"
+  demo.minikube/features: "auto-generation,conversation-processing,backstage-integration"
+  demo.minikube/resources: "256Mi memory, 200m CPU"

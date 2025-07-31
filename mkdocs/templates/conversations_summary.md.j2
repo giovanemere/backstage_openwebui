@@ -1,0 +1,162 @@
+# Resúmenes de Conversaciones
+
+Esta página contiene un resumen de todas las conversaciones de chat procesadas desde la integración Backstage-OpenWebUI.
+
+## 📊 Estadísticas Generales
+
+- **Total de Sesiones**: {{ sessions|length }}
+- **Sesiones con Contexto de Entidad**: {{ sessions|selectattr("entity_context")|list|length }}
+- **Promedio de Mensajes por Sesión**: {{ "%.1f"|format((sessions|sum(attribute='messages')|length / sessions|length) if sessions else 0) }}
+
+## 📋 Lista de Conversaciones
+
+{% for session in sessions|sort(attribute='updated_at', reverse=true) %}
+### {{ session.title }}
+
+**ID**: `{{ session.id }}`  
+**Creada**: {{ session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at }}  
+**Actualizada**: {{ session.updated_at.strftime('%d/%m/%Y %H:%M') if session.updated_at }}  
+**Mensajes**: {{ session.messages|length }}
+
+{% if session.entity_context %}
+**Entidad**: {{ session.entity_context.kind }} `{{ session.entity_context.namespace }}/{{ session.entity_context.name }}`
+{% endif %}
+
+{% if session.user_context %}
+**Usuario**: {{ session.user_context.get('display_name', session.user_context.get('user_id', 'Anónimo')) }}
+{% endif %}
+
+{% if session.summary %}
+**Resumen**: {{ session.summary }}
+{% endif %}
+
+{% if session.insights %}
+**Insights**:
+{% for insight in session.insights %}
+- {{ insight }}
+{% endfor %}
+{% endif %}
+
+{% if session.tags %}
+**Tags**: {% for tag in session.tags %}`{{ tag }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+
+#### Conversación
+
+{% for message in session.messages %}
+{% if message.role == 'user' %}
+!!! question "Usuario ({{ message.timestamp.strftime('%H:%M') }})"
+    {{ message.content }}
+{% elif message.role == 'assistant' %}
+!!! success "Asistente ({{ message.timestamp.strftime('%H:%M') }})"
+    {{ message.content }}
+{% elif message.role == 'system' %}
+!!! info "Sistema ({{ message.timestamp.strftime('%H:%M') }})"
+    {{ message.content }}
+{% endif %}
+{% endfor %}
+
+---
+
+{% endfor %}
+
+{% if not sessions %}
+!!! warning "Sin Conversaciones"
+    No se encontraron conversaciones para mostrar. Esto puede deberse a:
+    
+    - No hay conversaciones registradas en el sistema
+    - Error de conectividad con la API de integración
+    - Las conversaciones aún no han sido procesadas
+    
+    Verifica la configuración de la integración y intenta nuevamente.
+{% endif %}
+
+## 🔍 Filtros y Búsqueda
+
+### Por Tipo de Entidad
+
+{% set entity_types = sessions|selectattr("entity_context")|map(attribute="entity_context.kind")|unique|list %}
+{% if entity_types %}
+{% for entity_type in entity_types %}
+- **{{ entity_type }}**: {{ sessions|selectattr("entity_context")|selectattr("entity_context.kind", "equalto", entity_type)|list|length }} conversaciones
+{% endfor %}
+{% endif %}
+
+### Por Namespace
+
+{% set namespaces = sessions|selectattr("entity_context")|map(attribute="entity_context.namespace")|unique|list %}
+{% if namespaces %}
+{% for namespace in namespaces %}
+- **{{ namespace }}**: {{ sessions|selectattr("entity_context")|selectattr("entity_context.namespace", "equalto", namespace)|list|length }} conversaciones
+{% endfor %}
+{% endif %}
+
+### Por Tags Más Comunes
+
+{% set all_tags = [] %}
+{% for session in sessions %}
+  {% if session.tags %}
+    {% for tag in session.tags %}
+      {% set _ = all_tags.append(tag) %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if all_tags %}
+{% set tag_counts = {} %}
+{% for tag in all_tags %}
+  {% set _ = tag_counts.update({tag: tag_counts.get(tag, 0) + 1}) %}
+{% endfor %}
+
+{% for tag, count in tag_counts.items()|sort(attribute=1, reverse=true)[:10] %}
+- **{{ tag }}**: {{ count }} conversaciones
+{% endfor %}
+{% endif %}
+
+## 📈 Análisis Temporal
+
+### Conversaciones por Día
+
+{% set conversations_by_date = {} %}
+{% for session in sessions %}
+  {% if session.created_at %}
+    {% set date_key = session.created_at.strftime('%Y-%m-%d') %}
+    {% set _ = conversations_by_date.update({date_key: conversations_by_date.get(date_key, 0) + 1}) %}
+  {% endif %}
+{% endfor %}
+
+{% if conversations_by_date %}
+| Fecha | Conversaciones |
+|-------|----------------|
+{% for date, count in conversations_by_date.items()|sort(reverse=true)[:7] %}
+| {{ date }} | {{ count }} |
+{% endfor %}
+{% endif %}
+
+## 🎯 Insights Principales
+
+{% set all_insights = [] %}
+{% for session in sessions %}
+  {% if session.insights %}
+    {% for insight in session.insights %}
+      {% set _ = all_insights.append(insight) %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if all_insights %}
+{% set insight_counts = {} %}
+{% for insight in all_insights %}
+  {% set _ = insight_counts.update({insight: insight_counts.get(insight, 0) + 1}) %}
+{% endfor %}
+
+### Patrones Más Frecuentes
+
+{% for insight, count in insight_counts.items()|sort(attribute=1, reverse=true)[:5] %}
+- **{{ insight }}**: Aparece en {{ count }} conversaciones
+{% endfor %}
+{% endif %}
+
+---
+
+*Resumen generado automáticamente el {{ generated_at.strftime('%d de %B de %Y a las %H:%M') }}*

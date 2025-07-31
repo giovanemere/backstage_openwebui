@@ -1,0 +1,198 @@
+# Docker Compose para desarrollo local de Backstage + OpenWebUI
+# Autor: Amazon Q
+# Fecha: 2025-07-30
+
+version: '3.8'
+
+services:
+  # Base de datos PostgreSQL compartida
+  postgres:
+    image: postgres:15-alpine
+    container_name: backstage-postgres-dev
+    environment:
+      POSTGRES_DB: backstage_openwebui
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: dev-password
+      POSTGRES_MULTIPLE_DATABASES: backstage,openwebui
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./tools/database/init-multiple-databases.sh:/docker-entrypoint-initdb.d/init-multiple-databases.sh:ro
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backstage-network
+
+  # Redis para cache (opcional)
+  redis:
+    image: redis:7-alpine
+    container_name: backstage-redis-dev
+    ports:
+      - "6379:6379"
+    command: redis-server --requirepass dev-redis-password
+    volumes:
+      - redis_data:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks:
+      - backstage-network
+
+  # Backstage Backend (desarrollo)
+  backstage-backend:
+    build:
+      context: ./applications/backstage
+      dockerfile: Dockerfile.dev
+    container_name: backstage-backend-dev
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://postgres:dev-password@postgres:5432/backstage
+      REDIS_URL: redis://:dev-redis-password@redis:6379
+      OPENWEBUI_BASE_URL: http://openwebui:8080
+      LOG_LEVEL: debug
+    ports:
+      - "7007:7007"
+    volumes:
+      - ./applications/backstage:/app
+      - /app/node_modules
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backstage-network
+    restart: unless-stopped
+
+  # Backstage Frontend (desarrollo)
+  backstage-frontend:
+    build:
+      context: ./applications/backstage
+      dockerfile: Dockerfile.dev
+      target: frontend
+    container_name: backstage-frontend-dev
+    environment:
+      NODE_ENV: development
+    ports:
+      - "3000:3000"
+    volumes:
+      - ./applications/backstage:/app
+      - /app/node_modules
+    depends_on:
+      - backstage-backend
+    networks:
+      - backstage-network
+    restart: unless-stopped
+
+  # OpenWebUI
+  openwebui:
+    build:
+      context: ./applications/openwebui
+      dockerfile: Dockerfile.dev
+    container_name: openwebui-dev
+    environment:
+      DATABASE_URL: postgresql://postgres:dev-password@postgres:5432/openwebui
+      REDIS_URL: redis://:dev-redis-password@redis:6379
+      OPENAI_API_KEY: ${OPENAI_API_KEY:-demo-key}
+      DEFAULT_MODEL: gpt-3.5-turbo
+      LOG_LEVEL: debug
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./applications/openwebui:/app
+      - openwebui_data:/app/data
+    depends_on:
+      postgres:
+        condition: service_healthy
+      redis:
+        condition: service_healthy
+    networks:
+      - backstage-network
+    restart: unless-stopped
+
+  # MkDocs para documentación
+  mkdocs:
+    build:
+      context: ./tools/documentation/mkdocs
+      dockerfile: Dockerfile
+    container_name: mkdocs-dev
+    environment:
+      DATABASE_URL: postgresql://postgres:dev-password@postgres:5432/openwebui
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./tools/documentation/mkdocs:/docs
+      - docs_generated:/docs/site
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks:
+      - backstage-network
+    restart: unless-stopped
+    command: mkdocs serve --dev-addr=0.0.0.0:8000
+
+  # Jenkins para CI/CD (opcional)
+  jenkins:
+    build:
+      context: ./ci-cd/jenkins
+      dockerfile: Dockerfile
+    container_name: jenkins-dev
+    environment:
+      JENKINS_OPTS: "--httpPort=8081"
+      JAVA_OPTS: "-Xmx512m"
+    ports:
+      - "8081:8081"
+      - "50000:50000"
+    volumes:
+      - jenkins_data:/var/jenkins_home
+      - /var/run/docker.sock:/var/run/docker.sock:ro
+    networks:
+      - backstage-network
+    restart: unless-stopped
+    profiles:
+      - jenkins
+
+  # Nginx como reverse proxy (opcional)
+  nginx:
+    image: nginx:alpine
+    container_name: nginx-dev
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./config/development/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./config/development/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - backstage-frontend
+      - openwebui
+      - mkdocs
+    networks:
+      - backstage-network
+    restart: unless-stopped
+    profiles:
+      - nginx
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  openwebui_data:
+    driver: local
+  docs_generated:
+    driver: local
+  jenkins_data:
+    driver: local
+
+networks:
+  backstage-network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

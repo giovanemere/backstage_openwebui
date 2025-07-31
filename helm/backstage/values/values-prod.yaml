@@ -1,0 +1,289 @@
+# =============================================================================
+# Backstage Helm Values - Entorno de Producción
+# =============================================================================
+
+# Configuración para producción
+replicaCount: 3
+
+# Imagen de producción
+image:
+  registry: edissonz8809/iaops
+  repository: backstage
+  tag: "v1.0.0"
+  pullPolicy: IfNotPresent
+
+# Recursos para producción
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 500m
+    memory: 512Mi
+
+# Configuración de producción
+backstage:
+  app:
+    title: "Developer Portal - IA Ops"
+    baseUrl: "https://backstage.iaops.com"
+  
+  organization:
+    name: "IA Ops Organization"
+  
+  backend:
+    baseUrl: "https://backstage.iaops.com"
+    cors:
+      origin: "https://backstage.iaops.com"
+      credentials: true
+  
+  auth:
+    environment: "production"
+    providers:
+      github:
+        development:
+          clientId: "${GITHUB_CLIENT_ID}"
+          clientSecret: "${GITHUB_CLIENT_SECRET}"
+      google:
+        development:
+          clientId: "${GOOGLE_CLIENT_ID}"
+          clientSecret: "${GOOGLE_CLIENT_SECRET}"
+
+# PostgreSQL externa para producción
+postgresql:
+  enabled: false
+
+# Configuración de base de datos externa
+database:
+  enabled: true
+  type: "postgresql"
+  host: "postgres.iaops.com"
+  port: 5432
+  username: "backstage"
+  password: "${POSTGRES_PASSWORD}"
+  database: "backstage"
+  ssl: true
+
+# Ingress con TLS para producción
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+  hosts:
+    - host: "backstage.iaops.com"
+      paths:
+        - path: /
+          pathType: Prefix
+  tls:
+    - secretName: backstage-tls
+      hosts:
+        - backstage.iaops.com
+
+# Autoscaling habilitado para producción
+autoscaling:
+  enabled: true
+  minReplicas: 3
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Network policy restrictiva
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7007
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: monitoring
+      ports:
+        - protocol: TCP
+          port: 7007
+  egress:
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 5432
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+
+# Configuración de producción
+demo:
+  enabled: false
+
+# Integración con OpenWebUI
+openwebui:
+  enabled: true
+  url: "https://openwebui.iaops.com"
+  integration:
+    enabled: true
+    proxy: true
+
+# Kubernetes plugin para múltiples clusters
+kubernetes:
+  enabled: true
+  serviceLocatorMethod:
+    type: "multiTenant"
+  clusterLocatorMethods:
+    - type: "config"
+      clusters:
+        - url: "https://k8s-prod.iaops.com"
+          name: "production"
+          authProvider: "serviceAccount"
+          skipTLSVerify: false
+          skipMetricsLookup: false
+        - url: "https://k8s-staging.iaops.com"
+          name: "staging"
+          authProvider: "serviceAccount"
+          skipTLSVerify: false
+          skipMetricsLookup: false
+
+# Secrets de producción (usar external-secrets)
+secrets:
+  github:
+    token: "${GITHUB_TOKEN}"
+  openwebui:
+    token: "${OPENWEBUI_TOKEN}"
+
+# Health checks para producción
+livenessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 120
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 60
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Configuración de nodos para producción
+nodeSelector:
+  node-type: "backstage"
+
+tolerations:
+  - key: "backstage"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app.kubernetes.io/name
+                operator: In
+                values:
+                  - backstage
+          topologyKey: kubernetes.io/hostname
+
+# Configuración de seguridad estricta
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop:
+      - ALL
+  readOnlyRootFilesystem: true
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+# Configuración de monitoreo
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    interval: 30s
+    path: /metrics
+  
+  prometheusRule:
+    enabled: true
+    rules:
+      - alert: BackstageDown
+        expr: up{job="backstage"} == 0
+        for: 5m
+        labels:
+          severity: critical
+        annotations:
+          summary: "Backstage is down"
+          description: "Backstage has been down for more than 5 minutes"
+
+# Configuración de backup
+backup:
+  enabled: true
+  schedule: "0 2 * * *"
+  retention: "30d"
+
+# Configuración de logging
+logging:
+  enabled: true
+  level: "info"
+  format: "json"
+  
+  # Integración con ELK/EFK
+  elasticsearch:
+    enabled: true
+    host: "elasticsearch.logging.svc.cluster.local"
+    port: 9200
+
+# Configuración de cache
+cache:
+  enabled: true
+  redis:
+    enabled: true
+    host: "redis.cache.svc.cluster.local"
+    port: 6379
+
+# Configuración de CDN
+cdn:
+  enabled: true
+  provider: "cloudfront"
+  domain: "cdn.iaops.com"
+
+# Configuración de external-secrets
+externalSecrets:
+  enabled: true
+  secretStore:
+    provider: "aws"
+    region: "us-east-1"
+  secrets:
+    - name: "backstage-secrets"
+      keys:
+        - github-token
+        - openwebui-token
+        - postgres-password

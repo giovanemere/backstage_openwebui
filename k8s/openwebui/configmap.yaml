@@ -1,0 +1,200 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openwebui-config
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: config
+    demo.minikube: "true"
+data:
+  # Configuración principal de OpenWebUI
+  config.yaml: |
+    # OpenWebUI Configuration for Demo
+    app:
+      name: "OpenWebUI Demo"
+      description: "AI Chat Interface integrated with Backstage"
+      version: "demo-1.0.0"
+      
+    server:
+      host: "0.0.0.0"
+      port: 8080
+      cors:
+        enabled: true
+        origins:
+          - "http://localhost"
+          - "http://backstage:7007"
+          - "http://backstage.backstage-demo.svc.cluster.local:7007"
+        methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"]
+        headers: ["Content-Type", "Authorization", "X-Requested-With"]
+        
+    database:
+      type: "postgresql"
+      host: "${POSTGRES_HOST}"
+      port: "${POSTGRES_PORT}"
+      name: "${POSTGRES_DB}"
+      user: "${POSTGRES_USER}"
+      password: "${POSTGRES_PASSWORD}"
+      ssl_mode: "disable"
+      
+    auth:
+      enabled: true
+      default_user: "demo@example.com"
+      default_password: "demo123"
+      jwt_secret: "${JWT_SECRET}"
+      session_timeout: 3600
+      
+    ai:
+      providers:
+        - name: "ollama"
+          type: "ollama"
+          base_url: "http://ollama:11434"
+          enabled: true
+          models:
+            - "llama2"
+            - "codellama"
+            - "mistral"
+        - name: "openai"
+          type: "openai"
+          api_key: "${OPENAI_API_KEY}"
+          enabled: false
+          models:
+            - "gpt-3.5-turbo"
+            - "gpt-4"
+            
+    features:
+      chat: true
+      file_upload: true
+      code_execution: false
+      web_search: false
+      image_generation: false
+      
+    integrations:
+      backstage:
+        enabled: true
+        base_url: "http://backstage.backstage-demo.svc.cluster.local:7007"
+        api_token: "${BACKSTAGE_API_TOKEN}"
+        webhook_url: "/api/webhooks/backstage"
+        
+    storage:
+      type: "local"
+      path: "/app/data"
+      max_file_size: "10MB"
+      allowed_extensions: [".txt", ".md", ".pdf", ".doc", ".docx"]
+      
+    logging:
+      level: "INFO"
+      format: "json"
+      file: "/app/logs/openwebui.log"
+      
+    security:
+      rate_limit:
+        enabled: true
+        requests_per_minute: 60
+      content_filter:
+        enabled: true
+        blocked_words: []
+        
+  # Configuración de Nginx para proxy reverso
+  nginx.conf: |
+    events {
+        worker_connections 1024;
+    }
+    
+    http {
+        upstream openwebui {
+            server localhost:8080;
+        }
+        
+        server {
+            listen 80;
+            server_name _;
+            
+            client_max_body_size 50M;
+            
+            # Configuración para integración con Backstage
+            location /api/backstage/ {
+                proxy_pass http://backstage.backstage-demo.svc.cluster.local:7007/;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+            }
+            
+            # Configuración principal de OpenWebUI
+            location / {
+                proxy_pass http://openwebui;
+                proxy_set_header Host $host;
+                proxy_set_header X-Real-IP $remote_addr;
+                proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+                proxy_set_header X-Forwarded-Proto $scheme;
+                
+                # WebSocket support
+                proxy_http_version 1.1;
+                proxy_set_header Upgrade $http_upgrade;
+                proxy_set_header Connection "upgrade";
+            }
+            
+            # Health check endpoint
+            location /health {
+                access_log off;
+                return 200 "healthy\n";
+                add_header Content-Type text/plain;
+            }
+        }
+    }
+
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openwebui-models
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: models
+    demo.minikube: "true"
+data:
+  models.json: |
+    {
+      "models": [
+        {
+          "id": "demo-assistant",
+          "name": "Demo Assistant",
+          "description": "Assistant optimizado para demo de Backstage",
+          "provider": "local",
+          "type": "chat",
+          "config": {
+            "temperature": 0.7,
+            "max_tokens": 2048,
+            "system_prompt": "Eres un asistente especializado en DevOps, Kubernetes y Backstage. Ayudas a los desarrolladores con preguntas técnicas y mejores prácticas."
+          }
+        },
+        {
+          "id": "code-helper",
+          "name": "Code Helper",
+          "description": "Asistente especializado en código y desarrollo",
+          "provider": "local",
+          "type": "code",
+          "config": {
+            "temperature": 0.3,
+            "max_tokens": 4096,
+            "system_prompt": "Eres un experto en desarrollo de software. Ayudas con código, debugging, y mejores prácticas de programación."
+          }
+        }
+      ],
+      "default_model": "demo-assistant"
+    }
+    
+  # Script de inicialización de modelos
+  init-models.sh: |
+    #!/bin/bash
+    echo "Inicializando modelos para demo..."
+    
+    # Crear directorio de modelos si no existe
+    mkdir -p /app/models
+    
+    # Copiar configuración de modelos
+    cp /config/models.json /app/models/
+    
+    echo "Modelos inicializados correctamente"

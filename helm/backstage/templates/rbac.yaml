@@ -1,0 +1,60 @@
+{{- if .Values.rbac.create -}}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata:
+  name: {{ include "backstage.fullname" . }}-reader
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-rbac
+rules:
+  {{- toYaml .Values.rbac.rules | nindent 2 }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata:
+  name: {{ include "backstage.fullname" . }}-reader
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: ClusterRole
+  name: {{ include "backstage.fullname" . }}-reader
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "backstage.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ include "backstage.fullname" . }}-namespace-admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-rbac
+rules:
+  - apiGroups: ["*"]
+    resources: ["*"]
+    verbs: ["*"]
+
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ include "backstage.fullname" . }}-namespace-admin
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage-rbac
+roleRef:
+  apiGroup: rbac.authorization.k8s.io
+  kind: Role
+  name: {{ include "backstage.fullname" . }}-namespace-admin
+subjects:
+  - kind: ServiceAccount
+    name: {{ include "backstage.serviceAccountName" . }}
+    namespace: {{ .Release.Namespace }}
+{{- end }}

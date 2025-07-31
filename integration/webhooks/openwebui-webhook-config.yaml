@@ -1,0 +1,300 @@
+# Configuración de Webhooks para OpenWebUI
+# Permite enviar eventos de OpenWebUI a Backstage
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: openwebui-webhook-config
+  namespace: openwebui-demo
+  labels:
+    app.kubernetes.io/name: openwebui-webhook
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: webhook
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Configuración de webhooks de OpenWebUI"
+data:
+  # Configuración de webhooks para OpenWebUI
+  webhook-config.json: |
+    {
+      "webhooks": {
+        "enabled": true,
+        "endpoints": [
+          {
+            "name": "backstage-integration",
+            "url": "http://backstage.backstage-demo.svc.cluster.local:7007/api/webhooks/openwebui",
+            "secret": "${WEBHOOK_SECRET}",
+            "events": [
+              "chat.started",
+              "chat.message.sent",
+              "chat.session.ended",
+              "content.generated",
+              "model.used",
+              "user.action"
+            ],
+            "headers": {
+              "Content-Type": "application/json",
+              "X-Webhook-Source": "openwebui",
+              "X-Webhook-Version": "1.0",
+              "User-Agent": "OpenWebUI-Webhook/1.0"
+            },
+            "timeout": 30,
+            "retries": 3,
+            "retry_delay": 5
+          }
+        ],
+        "global_settings": {
+          "max_payload_size": 1048576,
+          "include_user_context": true,
+          "include_entity_context": true,
+          "sanitize_sensitive_data": true
+        }
+      }
+    }
+
+  # Script de webhook handler para OpenWebUI
+  webhook-handler.py: |
+    #!/usr/bin/env python3
+    """
+    Webhook Handler para OpenWebUI
+    Maneja el envío de eventos a Backstage
+    """
+    
+    import json
+    import httpx
+    import logging
+    from datetime import datetime
+    from typing import Dict, Any, Optional
+    import os
+    import hashlib
+    import hmac
+    
+    logger = logging.getLogger(__name__)
+    
+    class OpenWebUIWebhookHandler:
+        def __init__(self):
+            self.backstage_url = os.getenv(
+                "BACKSTAGE_WEBHOOK_URL",
+                "http://backstage.backstage-demo.svc.cluster.local:7007/api/webhooks/openwebui"
+            )
+            self.webhook_secret = os.getenv("WEBHOOK_SECRET", "demo-webhook-secret-key")
+            self.client = httpx.AsyncClient(timeout=30.0)
+        
+        def _generate_signature(self, payload: str) -> str:
+            """Generar signature para webhook"""
+            return hmac.new(
+                self.webhook_secret.encode(),
+                payload.encode(),
+                hashlib.sha256
+            ).hexdigest()
+        
+        async def send_webhook(
+            self,
+            event_type: str,
+            data: Dict[str, Any],
+            user_context: Optional[Dict[str, Any]] = None,
+            entity_context: Optional[Dict[str, Any]] = None
+        ) -> bool:
+            """Enviar webhook a Backstage"""
+            
+            payload = {
+                "event_type": event_type,
+                "data": data,
+                "user_context": user_context,
+                "entity_context": entity_context,
+                "timestamp": datetime.now().isoformat(),
+                "source": "openwebui"
+            }
+            
+            payload_str = json.dumps(payload, sort_keys=True)
+            signature = self._generate_signature(payload_str)
+            
+            headers = {
+                "Content-Type": "application/json",
+                "X-Webhook-Source": "openwebui",
+                "X-Webhook-Signature": f"sha256={signature}",
+                "X-Webhook-Version": "1.0",
+                "User-Agent": "OpenWebUI-Webhook/1.0"
+            }
+            
+            try:
+                response = await self.client.post(
+                    self.backstage_url,
+                    json=payload,
+                    headers=headers
+                )
+                
+                if response.status_code == 200:
+                    logger.info(f"Webhook sent successfully: {event_type}")
+                    return True
+                else:
+                    logger.error(f"Webhook failed: {response.status_code} {response.text}")
+                    return False
+                    
+            except Exception as e:
+                logger.error(f"Webhook error: {e}")
+                return False
+        
+        # Métodos para diferentes tipos de eventos
+        async def on_chat_started(self, session_id: str, entity_context: Dict, user_context: Dict):
+            """Evento: Chat iniciado"""
+            await self.send_webhook(
+                "chat.started",
+                {
+                    "session_id": session_id,
+                    "action": "chat_started"
+                },
+                user_context,
+                entity_context
+            )
+        
+        async def on_message_sent(self, session_id: str, message: Dict, user_context: Dict):
+            """Evento: Mensaje enviado"""
+            await self.send_webhook(
+                "chat.message.sent",
+                {
+                    "session_id": session_id,
+                    "message": {
+                        "id": message.get("id"),
+                        "role": message.get("role"),
+                        "content_length": len(message.get("content", "")),
+                        "timestamp": message.get("timestamp")
+                    }
+                },
+                user_context
+            )
+        
+        async def on_content_generated(self, content_type: str, entity_context: Dict, user_context: Dict):
+            """Evento: Contenido generado"""
+            await self.send_webhook(
+                "content.generated",
+                {
+                    "content_type": content_type,
+                    "action": "content_generated"
+                },
+                user_context,
+                entity_context
+            )
+        
+        async def on_model_used(self, model_id: str, usage_stats: Dict, user_context: Dict):
+            """Evento: Modelo utilizado"""
+            await self.send_webhook(
+                "model.used",
+                {
+                    "model_id": model_id,
+                    "usage_stats": usage_stats
+                },
+                user_context
+            )
+        
+        async def close(self):
+            """Cerrar cliente HTTP"""
+            await self.client.aclose()
+
+  # Configuración de eventos
+  events-config.yaml: |
+    # Configuración de eventos para webhooks
+    events:
+      # Eventos de chat
+      chat:
+        session_started:
+          enabled: true
+          include_entity_context: true
+          include_user_context: true
+          
+        message_sent:
+          enabled: true
+          include_content: false  # Por privacidad
+          include_metadata: true
+          
+        session_ended:
+          enabled: true
+          include_summary: true
+          
+      # Eventos de generación de contenido
+      content:
+        generated:
+          enabled: true
+          include_template: true
+          include_parameters: true
+          
+        enhanced:
+          enabled: true
+          include_original: false
+          include_enhancements: true
+          
+      # Eventos de modelo
+      model:
+        used:
+          enabled: true
+          include_performance_metrics: true
+          
+        error:
+          enabled: true
+          include_error_details: true
+          
+      # Eventos de usuario
+      user:
+        action:
+          enabled: true
+          include_context: true
+          
+        preference_changed:
+          enabled: false  # Deshabilitado por privacidad
+
+  # Filtros de eventos
+  event-filters.yaml: |
+    # Filtros para eventos de webhook
+    filters:
+      # Filtros por tipo de evento
+      event_type:
+        include:
+          - "chat.*"
+          - "content.generated"
+          - "model.used"
+        exclude:
+          - "user.preference_changed"
+          - "system.*"
+          
+      # Filtros por usuario
+      user:
+        exclude_anonymous: true
+        exclude_system_users: true
+        
+      # Filtros por entidad
+      entity:
+        include_kinds:
+          - "Component"
+          - "API"
+          - "Resource"
+          - "System"
+        exclude_namespaces:
+          - "system"
+          - "internal"
+          
+      # Filtros por contenido
+      content:
+        max_content_length: 10000
+        sanitize_sensitive_data: true
+        exclude_patterns:
+          - "password"
+          - "secret"
+          - "token"
+          - "key"
+
+---
+# Secret para webhooks de OpenWebUI
+apiVersion: v1
+kind: Secret
+metadata:
+  name: openwebui-webhook-secret
+  namespace: openwebui-demo
+  labels:
+    app.kubernetes.io/name: openwebui-webhook
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: webhook-secret
+type: Opaque
+data:
+  # webhook-secret: demo-webhook-secret-key (base64)
+  WEBHOOK_SECRET: ZGVtby13ZWJob29rLXNlY3JldC1rZXk=
+  BACKSTAGE_WEBHOOK_URL: aHR0cDovL2JhY2tzdGFnZS5iYWNrc3RhZ2UtZGVtby5zdmMuY2x1c3Rlci5sb2NhbDo3MDA3L2FwaS93ZWJob29rcy9vcGVud2VidWk=

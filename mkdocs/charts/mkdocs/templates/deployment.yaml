@@ -1,0 +1,162 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "mkdocs.fullname" . }}
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mkdocs.labels" . | nindent 4 }}
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "MkDocs deployment para documentación automática"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "mkdocs.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      labels:
+        {{- include "mkdocs.selectorLabels" . | nindent 8 }}
+      annotations:
+        demo.minikube/optimized: "true"
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+    spec:
+      {{- if .Values.serviceAccount.create }}
+      serviceAccountName: {{ include "mkdocs.serviceAccountName" . }}
+      {{- end }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      containers:
+      - name: mkdocs
+        image: "{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+        imagePullPolicy: {{ .Values.image.pullPolicy }}
+        ports:
+        - name: http
+          containerPort: {{ .Values.service.targetPort }}
+          protocol: TCP
+        env:
+        - name: INTEGRATION_API_URL
+          value: {{ .Values.env.INTEGRATION_API_URL | quote }}
+        - name: BACKSTAGE_API_URL
+          value: {{ .Values.env.BACKSTAGE_API_URL | quote }}
+        - name: MKDOCS_CONFIG_FILE
+          value: {{ .Values.env.MKDOCS_CONFIG_FILE | quote }}
+        - name: DOCS_OUTPUT_PATH
+          value: {{ .Values.env.DOCS_OUTPUT_PATH | quote }}
+        - name: SITE_OUTPUT_PATH
+          value: {{ .Values.env.SITE_OUTPUT_PATH | quote }}
+        - name: LOG_LEVEL
+          value: {{ .Values.env.LOG_LEVEL | quote }}
+        {{- if .Values.secrets.integrationTokens.enabled }}
+        - name: INTEGRATION_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mkdocs.fullname" . }}-secrets
+              key: integration-token
+        - name: BACKSTAGE_TOKEN
+          valueFrom:
+            secretKeyRef:
+              name: {{ include "mkdocs.fullname" . }}-secrets
+              key: backstage-token
+        {{- end }}
+        volumeMounts:
+        {{- if .Values.configMaps.mkdocsConfig.enabled }}
+        - name: mkdocs-config
+          mountPath: {{ .Values.configMaps.mkdocsConfig.mountPath }}
+          subPath: {{ .Values.configMaps.mkdocsConfig.subPath }}
+        {{- end }}
+        {{- if .Values.configMaps.processorConfig.enabled }}
+        - name: processor-config
+          mountPath: {{ .Values.configMaps.processorConfig.mountPath }}
+        {{- end }}
+        {{- if .Values.configMaps.templates.enabled }}
+        - name: templates
+          mountPath: {{ .Values.configMaps.templates.mountPath }}
+        {{- end }}
+        {{- if .Values.persistence.enabled }}
+        - name: site-data
+          mountPath: {{ .Values.persistence.mountPath }}
+        {{- end }}
+        - name: docs-source
+          mountPath: /app/docs-source
+        - name: data
+          mountPath: /app/data
+        resources:
+          {{- toYaml .Values.resources | nindent 10 }}
+        securityContext:
+          {{- toYaml .Values.securityContext | nindent 10 }}
+        {{- if .Values.healthChecks.enabled }}
+        livenessProbe:
+          {{- toYaml .Values.healthChecks.livenessProbe | nindent 10 }}
+        readinessProbe:
+          {{- toYaml .Values.healthChecks.readinessProbe | nindent 10 }}
+        {{- end }}
+        command:
+        - /bin/bash
+        - -c
+        - |
+          echo "Iniciando MkDocs con procesamiento automático..."
+          
+          # Crear directorios necesarios
+          mkdir -p /app/docs-source /app/site /app/data /app/templates
+          
+          # Copiar archivos de configuración si no existen
+          if [ ! -f /app/docs-source/index.md ]; then
+            echo "Creando documentación inicial..."
+            cat > /app/docs-source/index.md << 'EOF'
+          # Documentación en Construcción
+          
+          La documentación se está generando automáticamente desde las conversaciones.
+          Por favor, espera unos minutos mientras se procesan los datos.
+          
+          ## Estado del Sistema
+          
+          - ✅ MkDocs iniciado
+          - ⏳ Procesando conversaciones...
+          - ⏳ Generando documentación...
+          
+          Actualiza la página en unos minutos para ver el contenido completo.
+          EOF
+          fi
+          
+          # Iniciar MkDocs en modo servidor
+          echo "Iniciando servidor MkDocs..."
+          cd /app
+          mkdocs serve --config-file=/app/mkdocs.yml --dev-addr=0.0.0.0:8000 --livereload
+      volumes:
+      {{- if .Values.configMaps.mkdocsConfig.enabled }}
+      - name: mkdocs-config
+        configMap:
+          name: {{ include "mkdocs.fullname" . }}-config
+      {{- end }}
+      {{- if .Values.configMaps.processorConfig.enabled }}
+      - name: processor-config
+        configMap:
+          name: {{ include "mkdocs.fullname" . }}-processor-config
+      {{- end }}
+      {{- if .Values.configMaps.templates.enabled }}
+      - name: templates
+        configMap:
+          name: {{ include "mkdocs.fullname" . }}-templates
+      {{- end }}
+      {{- if .Values.persistence.enabled }}
+      - name: site-data
+        persistentVolumeClaim:
+          claimName: {{ include "mkdocs.fullname" . }}-pvc
+      {{- end }}
+      - name: docs-source
+        emptyDir: {}
+      - name: data
+        emptyDir: {}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

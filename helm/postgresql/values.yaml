@@ -1,0 +1,185 @@
+# PostgreSQL Chart Values - Optimized for Demo
+# Configuración para base de datos compartida entre Backstage y OpenWebUI
+
+# Configuración global
+global:
+  postgresql:
+    auth:
+      postgresPassword: "demo-postgres-password"
+      username: "backstage"
+      password: "demo-backstage-password"
+      database: "backstage_openwebui"
+    service:
+      ports:
+        postgresql: 5432
+
+# Configuración de la imagen (usando variables del .env)
+image:
+  registry: "${POSTGRESQL_IMAGE_REGISTRY:-docker.io}"
+  repository: "${POSTGRESQL_IMAGE_REPOSITORY:-postgres}"
+  tag: "${POSTGRESQL_IMAGE_TAG:-15-alpine}"
+  pullPolicy: IfNotPresent
+
+# Configuración de autenticación (usando variables del .env)
+auth:
+  enablePostgresUser: true
+  postgresPassword: "${POSTGRES_PASSWORD:-demo-postgres-password}"
+  username: "${POSTGRES_USER:-backstage}"
+  password: "${POSTGRES_PASSWORD:-demo-backstage-password}"
+  database: "${POSTGRES_DB:-backstage_openwebui}"
+  # Bases de datos adicionales para crear
+  existingSecret: ""
+
+# Configuración de recursos (optimizada para demo)
+resources:
+  limits:
+    memory: "${POSTGRES_MEMORY_LIMIT:-256Mi}"
+    cpu: "${POSTGRES_CPU_LIMIT:-200m}"
+  requests:
+    memory: "${POSTGRES_MEMORY_REQUEST:-128Mi}"
+    cpu: "${POSTGRES_CPU_REQUEST:-100m}"
+
+# Configuración de almacenamiento
+persistence:
+  enabled: true
+  storageClass: "${STORAGE_CLASS_NAME:-}"
+  accessModes:
+    - "${STORAGE_ACCESS_MODE:-ReadWriteOnce}"
+  size: "${POSTGRESQL_STORAGE_SIZE:-2Gi}"
+  mountPath: /var/lib/postgresql/data
+  subPath: ""
+
+# Configuración del servicio
+service:
+  type: ClusterIP
+  ports:
+    postgresql: 5432
+  nodePorts:
+    postgresql: ""
+  sessionAffinity: None
+
+# Configuración de red
+networkPolicy:
+  enabled: false
+
+# Configuración de seguridad
+securityContext:
+  enabled: true
+  fsGroup: 1001
+  runAsUser: 1001
+
+containerSecurityContext:
+  enabled: true
+  runAsUser: 1001
+  runAsNonRoot: true
+  readOnlyRootFilesystem: false
+
+# Configuración de PostgreSQL
+postgresqlConfiguration:
+  max_connections: 100
+  shared_buffers: 32MB
+  effective_cache_size: 128MB
+  maintenance_work_mem: 16MB
+  checkpoint_completion_target: 0.9
+  wal_buffers: 1MB
+  default_statistics_target: 100
+  random_page_cost: 1.1
+  effective_io_concurrency: 200
+  work_mem: 1MB
+  min_wal_size: 32MB
+  max_wal_size: 128MB
+
+# Configuración de logging
+postgresqlLogLevel: "WARNING"
+postgresqlLogConnections: false
+postgresqlLogDisconnections: false
+
+# Health checks (usando variables del .env)
+livenessProbe:
+  enabled: "${HEALTH_CHECK_ENABLED:-true}"
+  initialDelaySeconds: "${LIVENESS_PROBE_INITIAL_DELAY:-30}"
+  periodSeconds: "${LIVENESS_PROBE_PERIOD:-10}"
+  timeoutSeconds: "${LIVENESS_PROBE_TIMEOUT:-5}"
+  failureThreshold: "${LIVENESS_PROBE_FAILURE_THRESHOLD:-6}"
+  successThreshold: 1
+
+readinessProbe:
+  enabled: "${HEALTH_CHECK_ENABLED:-true}"
+  initialDelaySeconds: "${READINESS_PROBE_INITIAL_DELAY:-5}"
+  periodSeconds: "${READINESS_PROBE_PERIOD:-10}"
+  timeoutSeconds: "${READINESS_PROBE_TIMEOUT:-5}"
+  failureThreshold: "${READINESS_PROBE_FAILURE_THRESHOLD:-6}"
+  successThreshold: 1
+
+# Configuración de inicio
+initdb:
+  scripts:
+    init-multiple-databases.sh: |
+      #!/bin/bash
+      set -e
+      set -u
+      
+      function create_user_and_database() {
+        local database=$1
+        echo "Creating user and database '$database'"
+        psql -v ON_ERROR_STOP=1 --username "$POSTGRES_USER" <<-EOSQL
+          CREATE DATABASE $database;
+          GRANT ALL PRIVILEGES ON DATABASE $database TO $POSTGRES_USER;
+      EOSQL
+      }
+      
+      if [ -n "$POSTGRES_MULTIPLE_DATABASES" ]; then
+        echo "Multiple database creation requested: $POSTGRES_MULTIPLE_DATABASES"
+        for db in $(echo $POSTGRES_MULTIPLE_DATABASES | tr ',' ' '); do
+          create_user_and_database $db
+        done
+        echo "Multiple databases created"
+      fi
+
+# Variables de entorno adicionales
+extraEnvVars:
+  - name: POSTGRES_MULTIPLE_DATABASES
+    value: "${POSTGRES_MULTIPLE_DATABASES:-backstage,openwebui}"
+  - name: PGDATA
+    value: "${POSTGRES_DATA_DIR:-/var/lib/postgresql/data/pgdata}"
+  - name: POSTGRES_INITDB_ARGS
+    value: "${POSTGRES_INITDB_ARGS:---encoding=UTF8 --lc-collate=C --lc-ctype=C}"
+  - name: POSTGRES_HOST_AUTH_METHOD
+    value: "${POSTGRES_HOST_AUTH_METHOD:-md5}"
+  - name: POSTGRES_SHARED_PRELOAD_LIBRARIES
+    value: "${POSTGRES_SHARED_PRELOAD_LIBRARIES:-pg_stat_statements}"
+  # Variables de configuración desde .env
+  - name: LOG_LEVEL
+    value: "${LOG_LEVEL:-WARNING}"
+  - name: NODE_ENV
+    value: "${NODE_ENV:-demo}"
+  - name: DEBUG
+    value: "${DEBUG:-false}"
+
+# Configuración de métricas (deshabilitada para demo)
+metrics:
+  enabled: false
+
+# Configuración de backup (deshabilitada para demo)
+backup:
+  enabled: false
+
+# Configuración de replicación (deshabilitada para demo)
+replication:
+  enabled: false
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  seedData: true
+  testConnections: true
+
+# Labels adicionales
+commonLabels:
+  app.kubernetes.io/part-of: backstage-openwebui-demo
+  demo.minikube/component: database
+
+# Annotations adicionales
+commonAnnotations:
+  demo.minikube/optimized: "true"
+  demo.minikube/resource-profile: "minimal"

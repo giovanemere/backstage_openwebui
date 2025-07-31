@@ -1,0 +1,34 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgresql.fullname" . }}-init
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  {{- range $key, $value := .Values.initdb.scripts }}
+  {{ $key }}: |
+    {{- $value | nindent 4 }}
+  {{- end }}
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "postgresql.fullname" . }}-config
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+data:
+  postgresql.conf: |
+    # PostgreSQL configuration optimized for demo
+    {{- range $key, $value := .Values.postgresqlConfiguration }}
+    {{ $key }} = {{ $value }}
+    {{- end }}
+    
+    # Logging configuration
+    log_min_messages = {{ .Values.postgresqlLogLevel }}
+    log_connections = {{ .Values.postgresqlLogConnections }}
+    log_disconnections = {{ .Values.postgresqlLogDisconnections }}
+    
+    # Demo optimizations
+    fsync = off
+    synchronous_commit = off
+    full_page_writes = off

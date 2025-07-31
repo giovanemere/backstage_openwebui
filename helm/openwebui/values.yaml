@@ -1,0 +1,359 @@
+# OpenWebUI Helm Chart Values
+# Optimizado para demo en Minikube con integración Backstage
+
+# Configuración global
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+  storageClass: "standard"
+
+# Configuración de la imagen
+image:
+  registry: edissonz8809
+  repository: iaops/openwebui
+  tag: demo-latest
+  pullPolicy: IfNotPresent
+  pullSecrets: []
+
+# Configuración del nombre
+nameOverride: ""
+fullnameOverride: ""
+
+# Configuración del namespace
+namespaceOverride: "openwebui-demo"
+
+# Configuración de réplicas
+replicaCount: 1
+
+# Configuración de autoscaling
+autoscaling:
+  enabled: ${OPENWEBUI_HPA_ENABLED}
+  minReplicas: ${OPENWEBUI_HPA_MIN_REPLICAS}
+  maxReplicas: ${OPENWEBUI_HPA_MAX_REPLICAS}
+  targetCPUUtilizationPercentage: ${OPENWEBUI_HPA_CPU_TARGET}
+  targetMemoryUtilizationPercentage: ${OPENWEBUI_HPA_MEMORY_TARGET}
+
+# Configuración de recursos
+resources:
+  limits:
+    cpu: ${OPENWEBUI_CPU_LIMIT}
+    memory: ${OPENWEBUI_MEMORY_LIMIT}
+  requests:
+    cpu: ${OPENWEBUI_CPU_REQUEST}
+    memory: ${OPENWEBUI_MEMORY_REQUEST}
+
+# Configuración de init containers
+initContainers:
+  waitForDb:
+    enabled: true
+    image: busybox:1.35
+    resources:
+      limits:
+        cpu: 50m
+        memory: 64Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+  initData:
+    enabled: true
+    resources:
+      limits:
+        cpu: 50m
+        memory: 64Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+
+# Configuración de sidecar containers
+sidecars:
+  nginx:
+    enabled: ${OPENWEBUI_NGINX_ENABLED}
+    image: nginx:1.25-alpine
+    resources:
+      limits:
+        cpu: 50m
+        memory: 64Mi
+      requests:
+        cpu: 10m
+        memory: 32Mi
+
+# Configuración del servicio
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: http
+  protocol: TCP
+  annotations: {}
+  
+  # Servicio adicional para proxy
+  proxy:
+    enabled: true
+    port: 80
+    targetPort: proxy
+    
+  # Servicio headless
+  headless:
+    enabled: true
+    
+  # Servicio específico para API
+  api:
+    enabled: true
+    port: 8080
+
+# Configuración de Ingress
+ingress:
+  enabled: ${OPENWEBUI_INGRESS_ENABLED}
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/proxy-read-timeout: "300"
+    nginx.ingress.kubernetes.io/enable-cors: "true"
+    nginx.ingress.kubernetes.io/cors-allow-origin: "http://backstage.local, http://localhost:3000, http://localhost:7007"
+  hosts:
+    - host: ${OPENWEBUI_INGRESS_HOST}
+      paths:
+        - path: /
+          pathType: Prefix
+          service: openwebui
+          port: 80
+        - path: /api
+          pathType: Prefix
+          service: openwebui-api
+          port: 8080
+  tls: []
+
+# Configuración de almacenamiento persistente
+persistence:
+  enabled: true
+  storageClass: "standard"
+  accessModes:
+    - ReadWriteOnce
+  size: ${OPENWEBUI_STORAGE_SIZE}
+  annotations: {}
+  
+  # Almacenamiento adicional para modelos
+  models:
+    enabled: true
+    size: ${OPENWEBUI_MODELS_STORAGE_SIZE}
+    storageClass: "standard"
+
+# Configuración de la aplicación OpenWebUI
+openwebui:
+  # Configuración básica
+  name: "OpenWebUI Demo"
+  url: "http://openwebui:8080"
+  secretKey: "demo-jwt-secret-key-12345"
+  
+  # Configuración de autenticación
+  auth:
+    enabled: true
+    enableSignup: true
+    defaultUserRole: "user"
+    enableLoginForm: true
+    enableOAuthSignup: false
+    
+  # Configuración de características
+  features:
+    chat: true
+    fileUpload: true
+    codeExecution: false
+    webSearch: false
+    imageGeneration: false
+    
+  # Configuración de archivos
+  upload:
+    maxFileSize: "10485760"  # 10MB
+    allowedExtensions: [".txt", ".md", ".pdf", ".doc", ".docx"]
+    
+  # Configuración de AI providers
+  ai:
+    providers:
+      ollama:
+        enabled: true
+        baseUrl: "http://ollama:11434"
+        models: ["llama2", "codellama", "mistral"]
+      openai:
+        enabled: false
+        apiKey: "demo-openai-key"
+        models: ["gpt-3.5-turbo", "gpt-4"]
+        
+  # Configuración de integración con Backstage
+  backstage:
+    enabled: ${OPENWEBUI_BACKSTAGE_INTEGRATION}
+    baseUrl: "http://backstage.backstage-demo.svc.cluster.local:7007"
+    apiToken: "demo-backstage-token"
+    webhookUrl: "/api/webhooks/backstage"
+
+# Configuración de base de datos
+database:
+  type: "postgresql"
+  host: "postgresql"
+  port: 5432
+  name: "openwebui"
+  user: "openwebui"
+  password: "openwebui123"
+  sslMode: "disable"
+
+# Configuración de PostgreSQL (dependency)
+postgresql:
+  enabled: ${OPENWEBUI_POSTGRESQL_ENABLED}
+  auth:
+    postgresPassword: "postgres123"
+    username: "openwebui"
+    password: "openwebui123"
+    database: "openwebui"
+  primary:
+    resources:
+      limits:
+        cpu: ${POSTGRESQL_CPU_LIMIT}
+        memory: ${POSTGRESQL_MEMORY_LIMIT}
+      requests:
+        cpu: ${POSTGRESQL_CPU_REQUEST}
+        memory: ${POSTGRESQL_MEMORY_REQUEST}
+    persistence:
+      enabled: true
+      size: ${POSTGRESQL_STORAGE_SIZE}
+      storageClass: "standard"
+
+# Configuración de seguridad
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  capabilities:
+    drop:
+      - ALL
+
+# Configuración de ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Configuración de RBAC
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["configmaps", "secrets", "pods", "services"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: [""]
+      resources: ["events"]
+      verbs: ["get", "list", "watch"]
+
+# Configuración de Network Policies
+networkPolicy:
+  enabled: ${OPENWEBUI_NETWORK_POLICY_ENABLED}
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    enabled: true
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+      - namespaceSelector:
+          matchLabels:
+            name: backstage-demo
+  egress:
+    enabled: true
+    to:
+      - namespaceSelector:
+          matchLabels:
+            name: database-demo
+
+# Configuración de health checks
+livenessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /health
+    port: http
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Configuración de node selector y tolerations
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Configuración de pod disruption budget
+podDisruptionBudget:
+  enabled: false
+  minAvailable: 1
+
+# Configuración de monitoring
+monitoring:
+  enabled: false
+  serviceMonitor:
+    enabled: false
+    namespace: ""
+    labels: {}
+
+# Configuración de logging
+logging:
+  level: "INFO"
+  format: "json"
+
+# Variables de entorno adicionales
+extraEnvVars: []
+extraEnvVarsCM: ""
+extraEnvVarsSecret: ""
+
+# Configuración de volúmenes adicionales
+extraVolumes: []
+extraVolumeMounts: []
+
+# Configuración de init scripts
+initScripts: {}
+
+# Configuración de labels y annotations adicionales
+commonLabels:
+  demo.minikube: "true"
+  app.kubernetes.io/part-of: backstage-openwebui-demo
+
+commonAnnotations:
+  demo.minikube/optimized: "true"
+  demo.minikube/component: openwebui
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  minikube:
+    optimized: true
+    resourceLimits: true
+    networkPolicies: permissive
+  backstageIntegration:
+    enabled: true
+    crossNamespace: true
+  sampleData:
+    enabled: true
+    users:
+      - email: "demo@example.com"
+        password: "demo123"
+        role: "admin"
+      - email: "user@example.com"
+        password: "user123"
+        role: "user"

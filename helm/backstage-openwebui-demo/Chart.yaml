@@ -1,0 +1,40 @@
+apiVersion: v2
+name: backstage-openwebui-demo
+description: Complete Backstage + OpenWebUI integration demo for Minikube
+type: application
+version: "${DEMO_CHART_VERSION:-0.1.0}"
+appVersion: "${DEMO_APP_VERSION:-1.0.0}"
+keywords:
+  - backstage
+  - openwebui
+  - developer-portal
+  - ai
+  - chat
+  - demo
+  - minikube
+home: "${CHART_HOME_URL:-https://github.com/edissonz8809/iaops}"
+sources:
+  - "${CHART_SOURCE_URL:-https://github.com/edissonz8809/iaops}"
+maintainers:
+  - name: "${CHART_MAINTAINER_NAME:-Amazon Q}"
+    email: "${CHART_MAINTAINER_EMAIL:-demo@example.com}"
+dependencies:
+  - name: postgresql
+    version: "${POSTGRESQL_CHART_VERSION:-0.1.0}"
+    repository: "file://../postgresql"
+    condition: "${POSTGRESQL_DEPENDENCY_ENABLED:-postgresql.enabled}"
+  - name: backstage
+    version: "${BACKSTAGE_CHART_VERSION:-0.1.0}"
+    repository: "file://../backstage"
+    condition: "${BACKSTAGE_DEPENDENCY_ENABLED:-backstage.enabled}"
+  - name: openwebui
+    version: "${OPENWEBUI_CHART_VERSION:-0.1.0}"
+    repository: "file://../openwebui"
+    condition: "${OPENWEBUI_DEPENDENCY_ENABLED:-openwebui.enabled}"
+annotations:
+  category: "${BACKSTAGE_CHART_CATEGORY:-Developer Tools}"
+  demo.minikube/optimized: "${DEMO_MINIKUBE_OPTIMIZED:-true}"
+  demo.minikube/total-memory: "${DEMO_MINIKUBE_TOTAL_MEMORY:-1.4Gi}"
+  demo.minikube/total-cpu: "${DEMO_MINIKUBE_TOTAL_CPU:-1.3}"
+  demo.minikube/components: "${DEMO_CHART_COMPONENTS:-postgresql,backstage,openwebui}"
+  demo.minikube/features: "${DEMO_CHART_FEATURES:-chat-integration,shared-database,proxy-enabled}"

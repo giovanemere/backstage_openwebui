@@ -1,0 +1,89 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: backstage-network-policy
+  namespace: backstage-demo
+  labels:
+    app: backstage
+    component: security
+    demo.minikube: "true"
+    app.kubernetes.io/name: backstage
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+  annotations:
+    demo.minikube/description: "Política de red para Backstage (permisiva para demo)"
+spec:
+  podSelector:
+    matchLabels:
+      app: backstage
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Permitir tráfico desde ingress controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7007
+    # Permitir tráfico desde OpenWebUI
+    - from:
+        - podSelector:
+            matchLabels:
+              app: openwebui
+      ports:
+        - protocol: TCP
+          port: 7007
+    # Permitir tráfico desde Jenkins (para health checks)
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: jenkins
+      ports:
+        - protocol: TCP
+          port: 7007
+    # Permitir tráfico interno del namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+      ports:
+        - protocol: TCP
+          port: 7007
+  egress:
+    # Permitir conexión a PostgreSQL
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Permitir conexión a OpenWebUI
+    - to:
+        - podSelector:
+            matchLabels:
+              app: openwebui
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Permitir DNS
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Permitir HTTPS para GitHub y otros servicios externos
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    # Permitir acceso a Kubernetes API
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 6443

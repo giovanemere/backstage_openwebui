@@ -1,0 +1,258 @@
+# Guía de Inicio Rápido
+
+¡Bienvenido al sistema de documentación automática Backstage-OpenWebUI! Esta guía te ayudará a comenzar a usar todas las funcionalidades disponibles.
+
+## 🚀 Primeros Pasos
+
+### 1. Acceder al Sistema
+
+=== "Desde Backstage"
+    
+    1. Abre Backstage en tu navegador
+    2. Navega a cualquier entidad del catálogo (Component, API, Resource)
+    3. Busca el botón "Chat" o "AI Assistant" en la interfaz
+    4. ¡Comienza a chatear con contexto automático!
+
+=== "Acceso Directo a Documentación"
+    
+    1. Visita [docs.demo.local](http://docs.demo.local) (con ingress configurado)
+    2. O usa port-forward: `kubectl port-forward -n mkdocs-demo service/mkdocs 8000:8000`
+    3. Accede a [localhost:8000](http://localhost:8000)
+
+### 2. Explorar la Documentación
+
+La documentación se organiza en varias secciones:
+
+- **[Conversaciones](../conversations/summaries.md)**: Todas las sesiones de chat procesadas
+- **[Catálogo](../catalog/components.md)**: Entidades con sus conversaciones asociadas
+- **[Contenido Generado](../generated/documentation.md)**: Documentación creada automáticamente
+- **[API Reference](../api/endpoints.md)**: Documentación técnica de las APIs
+
+## 💬 Usar el Chat Contextual
+
+### Iniciar una Conversación
+
+1. **Desde una Entidad Específica**:
+   - Ve a cualquier Component, API o Resource en Backstage
+   - Haz clic en el botón de chat
+   - El contexto de la entidad se carga automáticamente
+
+2. **Chat General**:
+   - Usa el chat sin contexto específico
+   - Puedes mencionar entidades usando `@component-name`
+
+### Tipos de Preguntas Efectivas
+
+!!! tip "Preguntas Recomendadas"
+    
+    **Para Componentes**:
+    - "¿Cómo funciona este componente?"
+    - "¿Cuáles son las dependencias de este servicio?"
+    - "¿Cómo puedo desplegar este componente?"
+    - "¿Qué APIs expone este servicio?"
+    
+    **Para APIs**:
+    - "¿Cómo uso esta API?"
+    - "¿Cuáles son los endpoints disponibles?"
+    - "¿Cómo me autentico con esta API?"
+    - "¿Hay ejemplos de uso?"
+    
+    **Para Recursos**:
+    - "¿Cómo configuro este recurso?"
+    - "¿Cuáles son los parámetros requeridos?"
+    - "¿Hay problemas conocidos con este recurso?"
+
+### Funcionalidades Avanzadas
+
+#### Generación de Contenido
+
+El sistema puede generar automáticamente:
+
+- **README files** para componentes
+- **Documentación técnica** basada en especificaciones
+- **Guías de uso** para APIs
+- **Troubleshooting guides** basados en conversaciones
+
+#### Enriquecimiento de Entidades
+
+Las conversaciones pueden enriquecer automáticamente:
+
+- Descripciones faltantes
+- Tags relevantes
+- Enlaces a documentación
+- Metadatos adicionales
+
+## 📊 Entender la Documentación Generada
+
+### Estructura de Conversaciones
+
+Cada conversación incluye:
+
+- **Título**: Generado automáticamente
+- **Contexto de Entidad**: Si aplica
+- **Resumen**: Descripción automática del contenido
+- **Insights**: Patrones identificados
+- **Tags**: Categorización automática
+
+### Métricas y Análisis
+
+La documentación incluye análisis automático de:
+
+- **Patrones de uso**: Qué se pregunta más frecuentemente
+- **Entidades populares**: Cuáles generan más conversaciones
+- **Temas recurrentes**: Problemas o consultas comunes
+- **Tendencias temporales**: Evolución de las consultas
+
+## 🔧 Configuración Avanzada
+
+### Variables de Entorno
+
+Si tienes acceso administrativo, puedes configurar:
+
+```bash
+# URLs de APIs
+INTEGRATION_API_URL="http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000"
+BACKSTAGE_API_URL="http://backstage.backstage-demo.svc.cluster.local:7007"
+
+# Configuración de procesamiento
+PROCESSOR_SCHEDULE="*/15 * * * *"  # Cada 15 minutos
+LOG_LEVEL="INFO"
+```
+
+### Personalización de Templates
+
+Los templates de documentación se pueden personalizar editando:
+
+- `/app/templates/*.j2`: Templates de Jinja2
+- `/app/config/processor_config.yaml`: Configuración del procesador
+- `/app/mkdocs.yml`: Configuración de MkDocs
+
+## 🎯 Casos de Uso Comunes
+
+### 1. Documentar un Nuevo Componente
+
+1. Crea el componente en Backstage
+2. Inicia una conversación desde el componente
+3. Pregunta sobre funcionalidad, arquitectura, y uso
+4. La documentación se genera automáticamente
+5. Revisa en la sección [Contenido Generado](../generated/documentation.md)
+
+### 2. Troubleshooting de un Servicio
+
+1. Ve al componente con problemas
+2. Inicia chat con contexto del componente
+3. Describe el problema y síntomas
+4. El sistema categoriza como "troubleshooting"
+5. Se genera documentación de problemas conocidos
+
+### 3. Crear Guías de API
+
+1. Navega a la API en el catálogo
+2. Pregunta sobre endpoints, autenticación, ejemplos
+3. El sistema genera documentación estructurada
+4. Se incluye en la sección de APIs automáticamente
+
+### 4. Análisis de Patrones
+
+1. Revisa [Análisis de Conversaciones](../conversations/analysis.md)
+2. Identifica temas recurrentes
+3. Usa insights para mejorar documentación
+4. Crea contenido proactivo basado en patrones
+
+## 📈 Mejores Prácticas
+
+### Para Usuarios
+
+!!! success "Consejos para Conversaciones Efectivas"
+    
+    - **Sé específico**: Menciona versiones, entornos, casos de uso
+    - **Proporciona contexto**: Describe tu rol y objetivos
+    - **Haz preguntas de seguimiento**: Profundiza en temas importantes
+    - **Usa el contexto de entidad**: Inicia desde la entidad relevante
+
+### Para Administradores
+
+!!! info "Optimización del Sistema"
+    
+    - **Monitorea métricas**: Revisa regularmente los insights generados
+    - **Ajusta frecuencia**: Modifica el schedule del procesador según necesidad
+    - **Personaliza templates**: Adapta la documentación a tu organización
+    - **Mantén limpio**: Archiva conversaciones obsoletas regularmente
+
+## 🔍 Troubleshooting Común
+
+### La documentación no se actualiza
+
+1. Verifica que el CronJob esté ejecutándose:
+   ```bash
+   kubectl get cronjobs -n mkdocs-demo
+   ```
+
+2. Revisa logs del procesador:
+   ```bash
+   kubectl logs -f job/mkdocs-processor-<timestamp> -n mkdocs-demo
+   ```
+
+3. Ejecuta procesamiento manual:
+   ```bash
+   kubectl create job --from=cronjob/mkdocs-processor mkdocs-manual-$(date +%s) -n mkdocs-demo
+   ```
+
+### No aparecen conversaciones
+
+1. Verifica conectividad con APIs:
+   ```bash
+   kubectl exec -it deployment/mkdocs -n mkdocs-demo -- curl -s http://backstage-openwebui-integration.integration-demo.svc.cluster.local:8000/health
+   ```
+
+2. Revisa configuración de tokens:
+   ```bash
+   kubectl get secret mkdocs-secrets -n mkdocs-demo -o yaml
+   ```
+
+### Errores de permisos
+
+1. Verifica ServiceAccount:
+   ```bash
+   kubectl get serviceaccount mkdocs -n mkdocs-demo
+   ```
+
+2. Revisa NetworkPolicies:
+   ```bash
+   kubectl get networkpolicy -n mkdocs-demo
+   ```
+
+## 📚 Recursos Adicionales
+
+### Documentación Técnica
+
+- [API Reference](../api/endpoints.md): Documentación completa de endpoints
+- [Webhooks](../api/webhooks.md): Sistema de eventos en tiempo real
+- [Configuración](../deployment/configuration.md): Parámetros y variables
+
+### Guías Específicas
+
+- [Chat Contextual](contextual-chat.md): Guía detallada del chat inteligente
+- [Generación de Contenido](content-generation.md): Crear documentación con IA
+- [Troubleshooting](troubleshooting.md): Solución de problemas comunes
+
+### Comunidad y Soporte
+
+- **GitHub**: [edissonz8809/iaops](https://github.com/edissonz8809/iaops)
+- **Issues**: Reporta problemas y solicita funcionalidades
+- **Discussions**: Comparte casos de uso y mejores prácticas
+
+---
+
+!!! question "¿Necesitas Ayuda?"
+    
+    Si tienes preguntas específicas o necesitas asistencia:
+    
+    1. **Inicia una conversación** desde cualquier entidad relevante
+    2. **Revisa los insights** en la documentación existente
+    3. **Consulta el troubleshooting** para problemas comunes
+    4. **Contacta al equipo** a través de los canales oficiales
+
+---
+
+*Guía de inicio rápido generada automáticamente el {{ generated_at.strftime('%d de %B de %Y a las %H:%M') }}*

@@ -1,0 +1,139 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jenkins.fullname" . }}-config
+  labels:
+    {{- include "jenkins.labels" . | nindent 4 }}
+    demo.component: jenkins-config
+data:
+  jenkins.yaml: |
+    jenkins:
+      systemMessage: "{{ .Values.jenkins.systemMessage | default "Jenkins para Demo Backstage + OpenWebUI" }}"
+      numExecutors: {{ .Values.jenkins.numExecutors | default 2 }}
+      mode: NORMAL
+      scmCheckoutRetryCount: 3
+      
+      securityRealm:
+        local:
+          allowsSignup: false
+          users:
+            - id: "{{ .Values.jenkins.adminUser }}"
+              password: "{{ .Values.jenkins.adminPassword }}"
+            - id: "demo"
+              password: "demo123"
+
+      authorizationStrategy:
+        loggedInUsersCanDoAnything:
+          allowAnonymousRead: false
+
+      clouds:
+        - kubernetes:
+            name: "minikube"
+            serverUrl: "https://kubernetes.default.svc.cluster.local"
+            namespace: "{{ .Values.demo.minikube.namespace }}"
+            jenkinsUrl: "http://{{ include "jenkins.fullname" . }}:{{ .Values.service.port }}/jenkins"
+            jenkinsTunnel: "{{ include "jenkins.fullname" . }}:50000"
+            containerCapStr: "10"
+            retentionTimeout: 5
+            connectTimeout: 10
+            readTimeout: 20
+            templates:
+              - name: "jenkins-agent"
+                namespace: "{{ .Values.demo.minikube.namespace }}"
+                label: "jenkins-agent"
+                nodeUsageMode: "NORMAL"
+                containers:
+                  - name: "jnlp"
+                    image: "jenkins/inbound-agent:latest"
+                    workingDir: "/home/jenkins/agent"
+                    resourceRequestMemory: "256Mi"
+                    resourceLimitMemory: "512Mi"
+                    resourceRequestCpu: "100m"
+                    resourceLimitCpu: "500m"
+                volumes:
+                  - hostPathVolume:
+                      hostPath: "/var/run/docker.sock"
+                      mountPath: "/var/run/docker.sock"
+
+      globalNodeProperties:
+        - envVars:
+            env:
+              - key: "DOCKER_HOST"
+                value: "unix:///var/run/docker.sock"
+              - key: "MINIKUBE_PROFILE"
+                value: "{{ .Values.demo.minikube.profile }}"
+
+    tool:
+      git:
+        installations:
+          - name: "Default"
+            home: "/usr/bin/git"
+      
+      dockerTool:
+        installations:
+          - name: "docker"
+            home: "/usr/bin/docker"
+
+    credentials:
+      system:
+        domainCredentials:
+          - credentials:
+              - usernamePassword:
+                  scope: GLOBAL
+                  id: "dockerhub-credentials"
+                  username: "{{ .Values.credentials.dockerhub.username }}"
+                  password: "{{ .Values.credentials.dockerhub.password }}"
+                  description: "DockerHub credentials for demo"
+              - string:
+                  scope: GLOBAL
+                  id: "minikube-token"
+                  secret: "{{ .Values.credentials.minikube.token }}"
+                  description: "Minikube service account token"
+
+    appearance:
+      theme: "dark"
+
+    location:
+      adminAddress: "demo@example.com"
+      url: "http://{{ include "jenkins.fullname" . }}:{{ .Values.service.port }}/jenkins"
+
+    security:
+      globalJobDslSecurityConfiguration:
+        useScriptSecurity: false
+
+---
+{{- if .Values.jobs.enabled }}
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: {{ include "jenkins.fullname" . }}-jobs
+  labels:
+    {{- include "jenkins.labels" . | nindent 4 }}
+    demo.component: jenkins-jobs
+data:
+  jobs.groovy: |
+    folder('Demo') {
+      displayName('Demo Pipelines')
+      description('Pipelines para el demo Backstage + OpenWebUI')
+    }
+    
+    {{- range .Values.jobs.jobs }}
+    pipelineJob('Demo/{{ .name }}') {
+      displayName('{{ .description }}')
+      description('{{ .description }}')
+      definition {
+        cpsScm {
+          scm {
+            git {
+              remote {
+                url('https://github.com/edissonz8809/iaops.git')
+              }
+              branch('*/main')
+            }
+          }
+          scriptPath('{{ .scriptPath }}')
+        }
+      }
+    }
+    {{- end }}
+{{- end }}

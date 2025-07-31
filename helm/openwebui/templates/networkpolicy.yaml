@@ -1,0 +1,102 @@
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "openwebui.fullname" . }}
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: network-security
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+    demo.minikube/security-level: {{ .Values.demo.minikube.networkPolicies | default "demo" | quote }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "openwebui.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    {{- range .Values.networkPolicy.policyTypes }}
+    - {{ . }}
+    {{- end }}
+  {{- if .Values.networkPolicy.ingress.enabled }}
+  ingress:
+    {{- range .Values.networkPolicy.ingress.from }}
+    - from:
+        {{- if .namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .podSelector }}
+        - podSelector:
+            {{- toYaml .podSelector | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 80
+    {{- end }}
+    {{- if .Values.demo.minikube.networkPolicies | eq "permissive" }}
+    # Permitir health checks desde cualquier lugar (para demo)
+    - ports:
+        - protocol: TCP
+          port: 8080
+    {{- end }}
+  {{- end }}
+  {{- if .Values.networkPolicy.egress.enabled }}
+  egress:
+    {{- range .Values.networkPolicy.egress.to }}
+    - to:
+        {{- if .namespaceSelector }}
+        - namespaceSelector:
+            {{- toYaml .namespaceSelector | nindent 12 }}
+        {{- end }}
+        {{- if .podSelector }}
+        - podSelector:
+            {{- toYaml .podSelector | nindent 12 }}
+        {{- end }}
+      ports:
+        - protocol: TCP
+          port: 5432
+    {{- end }}
+    {{- if .Values.openwebui.backstage.enabled }}
+    # Permitir conexión a Backstage
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+        - podSelector:
+            matchLabels:
+              app: backstage
+      ports:
+        - protocol: TCP
+          port: 7007
+    {{- end }}
+    # Permitir DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    {{- if .Values.demo.minikube.networkPolicies | eq "permissive" }}
+    # Permitir conexiones HTTPS para APIs externas (demo)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    {{- end }}
+    {{- if .Values.openwebui.ai.providers.ollama.enabled }}
+    # Permitir conexión a Ollama
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ollama
+      ports:
+        - protocol: TCP
+          port: 11434
+    {{- end }}
+  {{- end }}
+{{- end }}

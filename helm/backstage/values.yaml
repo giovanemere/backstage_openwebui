@@ -1,0 +1,278 @@
+# =============================================================================
+# Backstage Helm Chart Values - Optimizado para Demo Minikube
+# =============================================================================
+
+# Configuración global
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Configuración de la imagen
+image:
+  registry: edissonz8809/iaops
+  repository: backstage
+  tag: "demo-latest"
+  pullPolicy: IfNotPresent
+
+# Configuración del servicio
+service:
+  type: ClusterIP
+  port: 7007
+  targetPort: 7007
+  annotations: {}
+
+# Configuración de recursos (optimizado para Minikube)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Configuración de réplicas
+replicaCount: 1
+
+# Configuración de autoscaling
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+  targetMemoryUtilizationPercentage: 80
+
+# Configuración de seguridad
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+
+# Configuración de Backstage
+backstage:
+  # Configuración de la aplicación
+  app:
+    title: "Backstage Demo"
+    baseUrl: "http://backstage:7007"
+    
+  # Configuración del backend
+  backend:
+    baseUrl: "http://backstage:7007"
+    listen:
+      port: 7007
+      host: "0.0.0.0"
+    cors:
+      origin: "http://localhost:3000"
+      credentials: true
+    
+  # Configuración de la organización
+  organization:
+    name: "Demo Organization"
+    
+  # Configuración de autenticación
+  auth:
+    environment: "development"
+    providers:
+      guest:
+        dangerouslyAllowOutsideDevelopment: true
+        
+  # Configuración del catálogo
+  catalog:
+    import:
+      entityFilename: "catalog-info.yaml"
+      pullRequestBranchName: "backstage-integration"
+    rules:
+      - allow: [Component, System, API, Resource, Location]
+      
+  # Configuración de TechDocs
+  techdocs:
+    builder: "local"
+    generator:
+      runIn: "local"
+    publisher:
+      type: "local"
+      
+  # Configuración de Scaffolder
+  scaffolder:
+    defaultAuthor:
+      name: "Demo User"
+      email: "demo@example.com"
+
+# Configuración de base de datos
+database:
+  enabled: true
+  type: "postgresql"
+  host: "postgresql"
+  port: 5432
+  username: "backstage"
+  password: "backstage123"
+  database: "backstage"
+
+# Configuración de PostgreSQL (dependencia)
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "postgres123"
+    username: "backstage"
+    password: "backstage123"
+    database: "backstage"
+  primary:
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Configuración de ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Accept-Encoding "";
+      sub_filter '<head>' '<head> <base href="/backstage/">';
+      sub_filter_once on;
+  hosts:
+    - host: ""
+      paths:
+        - path: /backstage(/|$)(.*)
+          pathType: Prefix
+  tls: []
+
+# Configuración de ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Configuración RBAC
+rbac:
+  create: true
+  rules:
+    # Permisos para leer recursos de Kubernetes
+    - apiGroups: [""]
+      resources: ["pods", "services", "configmaps", "secrets", "persistentvolumes", "persistentvolumeclaims", "nodes"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "replicasets", "statefulsets", "daemonsets"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["extensions", "networking.k8s.io"]
+      resources: ["ingresses"]
+      verbs: ["get", "list", "watch"]
+    - apiGroups: ["batch"]
+      resources: ["jobs", "cronjobs"]
+      verbs: ["get", "list", "watch"]
+
+# Configuración de nodos
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Configuración de health checks
+livenessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Configuración de secretos
+secrets:
+  github:
+    token: "demo-token"
+  openwebui:
+    token: "demo-openwebui-token"
+
+# Configuración de integración con OpenWebUI
+openwebui:
+  enabled: true
+  url: "http://openwebui:8080"
+  integration:
+    enabled: true
+    proxy: true
+
+# Configuración de Kubernetes plugin
+kubernetes:
+  enabled: true
+  serviceLocatorMethod:
+    type: "multiTenant"
+  clusterLocatorMethods:
+    - type: "config"
+      clusters:
+        - url: "https://kubernetes.default.svc.cluster.local"
+          name: "minikube-demo"
+          authProvider: "serviceAccount"
+          skipTLSVerify: true
+          skipMetricsLookup: false
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  minikube:
+    profile: "backstage-demo"
+    namespace: "backstage-demo"
+  
+  # Configuración de recursos optimizada
+  optimization:
+    enabled: true
+    memory:
+      limit: "512Mi"
+      request: "256Mi"
+    cpu:
+      limit: "500m"
+      request: "100m"
+  
+  # Features habilitadas para demo
+  features:
+    kubernetes: true
+    techdocs: true
+    catalog: true
+    scaffolder: true
+    openwebui: true
+    
+# Configuración de Network Policy
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7007
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432

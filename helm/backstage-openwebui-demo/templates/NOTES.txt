@@ -1,0 +1,61 @@
+🚀 Backstage + OpenWebUI Demo has been deployed successfully!
+
+📊 Resource Summary:
+- Total Memory: ~1.4Gi
+- Total CPU: ~1.3 cores
+- Components: PostgreSQL, Backstage, OpenWebUI
+
+🌐 Access URLs:
+{{- if .Values.backstage.ingress.enabled }}
+- Backstage Portal: http://backstage.local
+{{- else }}
+- Backstage Portal: kubectl port-forward svc/backstage 3000:3000
+{{- end }}
+
+{{- if .Values.openwebui.ingress.enabled }}
+- OpenWebUI Chat: http://openwebui.local
+{{- else }}
+- OpenWebUI Chat: kubectl port-forward svc/openwebui 8080:8080
+{{- end }}
+
+🔐 Demo Credentials:
+- Username: demo
+- Password: demo123
+
+📝 Getting Started:
+1. Add entries to your /etc/hosts file:
+   echo "$(minikube ip) backstage.local openwebui.local" | sudo tee -a /etc/hosts
+
+2. Access Backstage at http://backstage.local
+3. Use the integrated chat feature to interact with AI
+4. Explore the catalog and documentation features
+
+🔧 Useful Commands:
+- Check pod status: kubectl get pods
+- View logs: kubectl logs -f deployment/backstage
+- Access database: kubectl exec -it deployment/postgresql -- psql -U backstage -d backstage_openwebui
+
+📚 Features Available:
+✅ Developer Portal (Backstage)
+✅ AI Chat Integration (OpenWebUI)
+✅ Shared Database (PostgreSQL)
+✅ Basic Authentication
+✅ Catalog Management
+✅ TechDocs Support
+✅ Chat Export to Docs
+
+🎯 Demo Scenarios:
+1. Browse the software catalog
+2. Chat with AI assistant
+3. Export chat conversations to documentation
+4. Create new components using templates
+
+⚠️  Note: This is a demo configuration optimized for Minikube.
+   Not suitable for production use.
+
+🆘 Troubleshooting:
+- If pods are pending: Check resource availability with 'kubectl describe nodes'
+- If ingress not working: Ensure nginx ingress controller is enabled
+- For database issues: Check PostgreSQL logs with 'kubectl logs deployment/postgresql'
+
+Happy coding! 🎉

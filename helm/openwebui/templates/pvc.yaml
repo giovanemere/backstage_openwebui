@@ -1,0 +1,57 @@
+{{- if .Values.persistence.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openwebui.fullname" . }}-data
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: storage
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+    {{- with .Values.persistence.annotations }}
+    {{- toYaml . | nindent 4 }}
+    {{- end }}
+spec:
+  accessModes:
+    {{- range .Values.persistence.accessModes }}
+    - {{ . | quote }}
+    {{- end }}
+  resources:
+    requests:
+      storage: {{ .Values.persistence.size | quote }}
+  {{- if .Values.persistence.storageClass }}
+  {{- if (eq "-" .Values.persistence.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}
+
+---
+{{- if and .Values.persistence.enabled .Values.persistence.models.enabled }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "openwebui.fullname" . }}-models
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: models-storage
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: {{ .Values.persistence.models.size | quote }}
+  {{- if .Values.persistence.models.storageClass }}
+  {{- if (eq "-" .Values.persistence.models.storageClass) }}
+  storageClassName: ""
+  {{- else }}
+  storageClassName: {{ .Values.persistence.models.storageClass | quote }}
+  {{- end }}
+  {{- end }}
+{{- end }}

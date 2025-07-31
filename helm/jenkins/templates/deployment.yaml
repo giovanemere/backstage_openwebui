@@ -1,0 +1,123 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "jenkins.fullname" . }}
+  labels:
+    {{- include "jenkins.labels" . | nindent 4 }}
+    demo.component: jenkins
+    demo.minikube: "true"
+spec:
+  replicas: {{ .Values.replicaCount }}
+  selector:
+    matchLabels:
+      {{- include "jenkins.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        demo.minikube/optimized: "true"
+      labels:
+        {{- include "jenkins.selectorLabels" . | nindent 8 }}
+        demo.component: jenkins
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "jenkins.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: init-jenkins
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Inicializando Jenkins para demo..."
+              chown -R 1000:1000 /var/jenkins_home
+              echo "Permisos configurados correctamente"
+          volumeMounts:
+            - name: jenkins-home
+              mountPath: /var/jenkins_home
+          securityContext:
+            runAsUser: 0
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+            - name: agent
+              containerPort: 50000
+              protocol: TCP
+          env:
+            - name: JAVA_OPTS
+              value: {{ .Values.jenkins.javaOpts | quote }}
+            - name: JENKINS_OPTS
+              value: {{ .Values.jenkins.jenkinsOpts | quote }}
+            - name: JENKINS_SLAVE_AGENT_PORT
+              value: "50000"
+            - name: CASC_JENKINS_CONFIG
+              value: "/var/jenkins_home/casc_configs"
+            {{- if .Values.demo.enabled }}
+            - name: DEMO_MODE
+              value: "true"
+            - name: MINIKUBE_PROFILE
+              value: {{ .Values.demo.minikube.profile | quote }}
+            {{- end }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+          volumeMounts:
+            - name: jenkins-home
+              mountPath: /var/jenkins_home
+            - name: jenkins-config
+              mountPath: /var/jenkins_home/casc_configs
+              readOnly: true
+            - name: docker-sock
+              mountPath: /var/run/docker.sock
+            {{- if .Values.jobs.enabled }}
+            - name: jenkins-jobs
+              mountPath: /var/jenkins_home/jobs
+              readOnly: true
+            {{- end }}
+      volumes:
+        - name: jenkins-home
+          {{- if .Values.persistence.enabled }}
+          persistentVolumeClaim:
+            claimName: {{ include "jenkins.fullname" . }}-pvc
+          {{- else }}
+          emptyDir: {}
+          {{- end }}
+        - name: jenkins-config
+          configMap:
+            name: {{ include "jenkins.fullname" . }}-config
+        - name: docker-sock
+          hostPath:
+            path: /var/run/docker.sock
+            type: Socket
+        {{- if .Values.jobs.enabled }}
+        - name: jenkins-jobs
+          configMap:
+            name: {{ include "jenkins.fullname" . }}-jobs
+        {{- end }}
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

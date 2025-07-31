@@ -1,0 +1,131 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "backstage.fullname" . }}
+  labels:
+    {{- include "backstage.labels" . | nindent 4 }}
+    demo.component: backstage
+    demo.minikube: "true"
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "backstage.selectorLabels" . | nindent 6 }}
+  template:
+    metadata:
+      annotations:
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+        demo.minikube/optimized: "true"
+      labels:
+        {{- include "backstage.selectorLabels" . | nindent 8 }}
+        demo.component: backstage
+    spec:
+      {{- with .Values.global.imagePullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      serviceAccountName: {{ include "backstage.serviceAccountName" . }}
+      securityContext:
+        {{- toYaml .Values.podSecurityContext | nindent 8 }}
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Esperando a que PostgreSQL esté listo..."
+              until nc -z {{ .Values.database.host }} {{ .Values.database.port }}; do
+                echo "PostgreSQL no está listo, esperando..."
+                sleep 2
+              done
+              echo "PostgreSQL está listo!"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+      containers:
+        - name: {{ .Chart.Name }}
+          securityContext:
+            {{- toYaml .Values.securityContext | nindent 12 }}
+          image: "{{ .Values.image.registry }}/{{ .Values.image.repository }}:{{ .Values.image.tag }}"
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: {{ .Values.service.targetPort }}
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: APP_CONFIG_app_baseUrl
+              value: {{ .Values.backstage.app.baseUrl | quote }}
+            - name: APP_CONFIG_backend_baseUrl
+              value: {{ .Values.backstage.backend.baseUrl | quote }}
+            - name: APP_CONFIG_backend_listen_port
+              value: {{ .Values.backstage.backend.listen.port | quote }}
+            - name: APP_CONFIG_backend_listen_host
+              value: {{ .Values.backstage.backend.listen.host | quote }}
+            {{- if .Values.demo.enabled }}
+            - name: DEMO_MODE
+              value: "true"
+            - name: MINIKUBE_PROFILE
+              value: {{ .Values.demo.minikube.profile | quote }}
+            {{- end }}
+          envFrom:
+            - secretRef:
+                name: {{ include "backstage.fullname" . }}-secrets
+            - secretRef:
+                name: {{ include "backstage.fullname" . }}-db-secrets
+          volumeMounts:
+            - name: app-config
+              mountPath: /app/app-config.yaml
+              subPath: app-config.yaml
+              readOnly: true
+            - name: entities-config
+              mountPath: /app/examples/entities.yaml
+              subPath: entities.yaml
+              readOnly: true
+            - name: temp-dir
+              mountPath: /tmp
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          resources:
+            {{- toYaml .Values.resources | nindent 12 }}
+      volumes:
+        - name: app-config
+          configMap:
+            name: {{ include "backstage.fullname" . }}-config
+            items:
+              - key: app-config.yaml
+                path: app-config.yaml
+        - name: entities-config
+          configMap:
+            name: {{ include "backstage.fullname" . }}-config
+            items:
+              - key: entities.yaml
+                path: entities.yaml
+        - name: temp-dir
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst
+      {{- with .Values.nodeSelector }}
+      nodeSelector:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.affinity }}
+      affinity:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- with .Values.tolerations }}
+      tolerations:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}

@@ -1,0 +1,223 @@
+# OpenWebUI Helm Chart Values - Production Environment
+# Configuración optimizada para producción
+
+# Configuración de réplicas (producción)
+replicaCount: 2
+
+# Configuración de recursos (producción)
+resources:
+  limits:
+    cpu: 2000m
+    memory: 2Gi
+  requests:
+    cpu: 500m
+    memory: 1Gi
+
+# Autoscaling para producción
+autoscaling:
+  enabled: true
+  minReplicas: 2
+  maxReplicas: 10
+  targetCPUUtilizationPercentage: 60
+  targetMemoryUtilizationPercentage: 70
+
+# Configuración de Ingress para producción
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: openwebui.company.com
+      paths:
+        - path: /
+          pathType: Prefix
+          service: openwebui
+          port: 80
+  tls:
+    - secretName: openwebui-tls
+      hosts:
+        - openwebui.company.com
+  annotations:
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "25m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+
+# Configuración de almacenamiento (producción)
+persistence:
+  enabled: true
+  size: 50Gi
+  storageClass: "fast-ssd"
+  models:
+    enabled: true
+    size: 100Gi
+    storageClass: "fast-ssd"
+
+# Configuración de OpenWebUI para producción
+openwebui:
+  name: "OpenWebUI Production"
+  auth:
+    enabled: true
+    enableSignup: false  # Deshabilitado en producción
+    defaultUserRole: "user"
+    enableOAuthSignup: true  # OAuth habilitado en producción
+  features:
+    chat: true
+    fileUpload: true
+    codeExecution: false  # Deshabilitado por seguridad
+    webSearch: true
+    imageGeneration: true
+  upload:
+    maxFileSize: "26214400"  # 25MB
+    allowedExtensions: [".txt", ".md", ".pdf", ".doc", ".docx", ".ppt", ".pptx"]
+  ai:
+    providers:
+      ollama:
+        enabled: true
+        baseUrl: "http://ollama.ai-services.svc.cluster.local:11434"
+      openai:
+        enabled: true
+        apiKey: ""  # Debe ser configurado via secret
+  backstage:
+    enabled: true
+    baseUrl: "http://backstage.platform.svc.cluster.local:7007"
+
+# PostgreSQL externo para producción
+postgresql:
+  enabled: false  # Usar base de datos externa
+
+# Configuración de base de datos externa
+database:
+  type: "postgresql"
+  host: "postgres.database.svc.cluster.local"
+  port: 5432
+  name: "openwebui_prod"
+  user: "openwebui_prod"
+  # password debe ser configurado via secret
+
+# Network policies restrictivas para producción
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    enabled: true
+    from:
+      - namespaceSelector:
+          matchLabels:
+            name: ingress-nginx
+        podSelector:
+          matchLabels:
+            app.kubernetes.io/name: ingress-nginx
+      - namespaceSelector:
+          matchLabels:
+            name: platform
+        podSelector:
+          matchLabels:
+            app: backstage
+  egress:
+    enabled: true
+    to:
+      - namespaceSelector:
+          matchLabels:
+            name: database
+        podSelector:
+          matchLabels:
+            app: postgresql
+      - namespaceSelector:
+          matchLabels:
+            name: ai-services
+        podSelector:
+          matchLabels:
+            app: ollama
+
+# Configuración de seguridad estricta
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001
+  seccompProfile:
+    type: RuntimeDefault
+
+containerSecurityContext:
+  allowPrivilegeEscalation: false
+  runAsNonRoot: true
+  runAsUser: 1001
+  readOnlyRootFilesystem: true
+  capabilities:
+    drop:
+      - ALL
+
+# Pod Disruption Budget para alta disponibilidad
+podDisruptionBudget:
+  enabled: true
+  minAvailable: 1
+
+# Configuración de monitoring
+monitoring:
+  enabled: true
+  serviceMonitor:
+    enabled: true
+    namespace: monitoring
+    labels:
+      app: openwebui
+      environment: production
+
+# Configuración de logging para producción
+logging:
+  level: "WARN"
+  format: "json"
+
+# Node selector para nodos de producción
+nodeSelector:
+  node-type: "production"
+  
+# Tolerations para nodos dedicados
+tolerations:
+  - key: "production"
+    operator: "Equal"
+    value: "true"
+    effect: "NoSchedule"
+
+# Anti-affinity para distribución de pods
+affinity:
+  podAntiAffinity:
+    preferredDuringSchedulingIgnoredDuringExecution:
+      - weight: 100
+        podAffinityTerm:
+          labelSelector:
+            matchExpressions:
+              - key: app
+                operator: In
+                values:
+                  - openwebui
+          topologyKey: kubernetes.io/hostname
+
+# Sidecars deshabilitados en producción (usar ingress controller)
+sidecars:
+  nginx:
+    enabled: false
+
+# Labels específicos para producción
+commonLabels:
+  environment: production
+  tier: frontend
+  app.kubernetes.io/part-of: ai-platform
+
+commonAnnotations:
+  environment: "production"
+  security-level: "high"
+  backup-policy: "daily"
+
+# Configuración específica para producción
+demo:
+  enabled: false
+  minikube:
+    optimized: false
+    resourceLimits: false
+    networkPolicies: strict
+  backstageIntegration:
+    enabled: true
+    crossNamespace: false  # Más restrictivo en producción
+  sampleData:
+    enabled: false  # Sin datos de ejemplo en producción

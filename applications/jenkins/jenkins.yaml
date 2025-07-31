@@ -1,0 +1,134 @@
+# Jenkins Configuration as Code - Demo Minikube
+jenkins:
+  systemMessage: "Jenkins para Demo Backstage + OpenWebUI en Minikube"
+  numExecutors: 2
+  mode: NORMAL
+  scmCheckoutRetryCount: 3
+  
+  # Security configuration for demo
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "demo-jenkins-password"
+          properties:
+            - "hudson.model.MyViewsProperty"
+            - "hudson.security.HudsonPrivateSecurityRealm$Details"
+  
+  authorizationStrategy:
+    globalMatrix:
+      permissions:
+        - "Overall/Administer:admin"
+        - "Overall/Read:authenticated"
+        - "Job/Build:authenticated"
+        - "Job/Read:authenticated"
+
+  # Global tool configuration
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DEMO_MODE"
+            value: "true"
+          - key: "MINIKUBE_OPTIMIZED"
+            value: "true"
+          - key: "DOCKER_REGISTRY"
+            value: "edissonz8809/iaops"
+
+  # Node configuration for demo
+  nodes:
+    - permanent:
+        name: "minikube-node"
+        remoteFS: "/home/jenkins"
+        launcher:
+          inbound:
+            webSocket: true
+
+# Credentials for demo
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "dockerhub-credentials"
+              username: "edissonz8809"
+              password: "CHANGE_ME"
+              description: "DockerHub credentials for demo"
+          - string:
+              scope: GLOBAL
+              id: "github-token"
+              secret: "CHANGE_ME"
+              description: "GitHub token for demo"
+
+# Job DSL configuration
+jobs:
+  - script: |
+      pipelineJob('backstage-build') {
+        description('Build Backstage application for demo')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/edissonz8809/iaops.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('ci-cd/jenkins/Jenkinsfile.backstage')
+          }
+        }
+        triggers {
+          scm('H/5 * * * *')
+        }
+      }
+  
+  - script: |
+      pipelineJob('openwebui-build') {
+        description('Build OpenWebUI application for demo')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/edissonz8809/iaops.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('ci-cd/jenkins/Jenkinsfile.openwebui')
+          }
+        }
+        triggers {
+          scm('H/5 * * * *')
+        }
+      }
+
+# Tool configuration
+tool:
+  git:
+    installations:
+      - name: "Default"
+        home: "/usr/bin/git"
+  
+  dockerTool:
+    installations:
+      - name: "docker"
+        home: "/usr/bin/docker"
+
+# Unclassified configuration
+unclassified:
+  location:
+    url: "http://jenkins:8080/jenkins"
+    adminAddress: "demo@example.com"
+  
+  globalLibraries:
+    libraries:
+      - name: "demo-pipeline-library"
+        defaultVersion: "main"
+        retriever:
+          modernSCM:
+            scm:
+              git:
+                remote: "https://github.com/edissonz8809/iaops.git"

@@ -1,0 +1,235 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: openwebui
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: frontend
+    demo.minikube: "true"
+    app.kubernetes.io/name: openwebui
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    app.kubernetes.io/component: frontend
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: openwebui
+      component: frontend
+  template:
+    metadata:
+      labels:
+        app: openwebui
+        component: frontend
+        demo.minikube: "true"
+      annotations:
+        demo.minikube/optimized: "true"
+        demo.minikube/memory-limit: "512Mi"
+        demo.minikube/cpu-limit: "500m"
+        demo.minikube/ai-chat: "enabled"
+    spec:
+      serviceAccountName: openwebui
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 1001
+        fsGroup: 1001
+      initContainers:
+        - name: wait-for-db
+          image: busybox:1.35
+          command:
+            - sh
+            - -c
+            - |
+              echo "Esperando a que PostgreSQL esté listo..."
+              until nc -z postgresql 5432; do
+                echo "PostgreSQL no está listo, esperando..."
+                sleep 2
+              done
+              echo "PostgreSQL está listo!"
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+        - name: init-data
+          image: edissonz8809/iaops/openwebui:demo-latest
+          command:
+            - sh
+            - -c
+            - |
+              echo "Inicializando datos de OpenWebUI..."
+              mkdir -p /app/data/uploads
+              mkdir -p /app/data/models
+              mkdir -p /app/logs
+              chown -R 1001:1001 /app/data /app/logs
+              echo "Datos inicializados correctamente"
+          volumeMounts:
+            - name: data-storage
+              mountPath: /app/data
+            - name: logs-storage
+              mountPath: /app/logs
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+      containers:
+        - name: openwebui
+          image: edissonz8809/iaops/openwebui:demo-latest
+          imagePullPolicy: IfNotPresent
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            - name: NODE_ENV
+              value: "production"
+            - name: WEBUI_NAME
+              value: "OpenWebUI Demo"
+            - name: WEBUI_URL
+              value: "http://openwebui:8080"
+            - name: WEBUI_SECRET_KEY
+              valueFrom:
+                secretKeyRef:
+                  name: openwebui-secrets
+                  key: JWT_SECRET
+            - name: ENABLE_SIGNUP
+              value: "true"
+            - name: DEFAULT_USER_ROLE
+              value: "user"
+            - name: ENABLE_LOGIN_FORM
+              value: "true"
+            - name: ENABLE_OAUTH_SIGNUP
+              value: "false"
+            - name: WEBUI_AUTH
+              value: "true"
+            # Configuración de base de datos
+            - name: DATABASE_URL
+              value: "postgresql://$(POSTGRES_USER):$(POSTGRES_PASSWORD)@$(POSTGRES_HOST):$(POSTGRES_PORT)/$(POSTGRES_DB)"
+            # Configuración de integración con Backstage
+            - name: BACKSTAGE_URL
+              value: "http://backstage.backstage-demo.svc.cluster.local:7007"
+            - name: BACKSTAGE_INTEGRATION
+              value: "true"
+            # Configuración de AI
+            - name: OLLAMA_BASE_URL
+              value: "http://ollama:11434"
+            - name: ENABLE_OLLAMA_API
+              value: "true"
+            # Configuración de archivos
+            - name: UPLOAD_DIR
+              value: "/app/data/uploads"
+            - name: MAX_FILE_SIZE
+              value: "10485760"  # 10MB
+          envFrom:
+            - secretRef:
+                name: openwebui-secrets
+            - secretRef:
+                name: openwebui-db-secrets
+            - secretRef:
+                name: openwebui-admin-secrets
+          volumeMounts:
+            - name: config-volume
+              mountPath: /app/config
+              readOnly: true
+            - name: models-config
+              mountPath: /app/models-config
+              readOnly: true
+            - name: data-storage
+              mountPath: /app/data
+            - name: logs-storage
+              mountPath: /app/logs
+            - name: temp-dir
+              mountPath: /tmp
+          resources:
+            requests:
+              memory: "256Mi"
+              cpu: "100m"
+            limits:
+              memory: "512Mi"
+              cpu: "500m"
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 60
+            periodSeconds: 30
+            timeoutSeconds: 10
+            failureThreshold: 3
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: http
+            initialDelaySeconds: 30
+            periodSeconds: 10
+            timeoutSeconds: 5
+            failureThreshold: 3
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 1001
+            capabilities:
+              drop:
+                - ALL
+        # Sidecar container para Nginx proxy (opcional para demo avanzado)
+        - name: nginx-proxy
+          image: nginx:1.25-alpine
+          ports:
+            - name: proxy
+              containerPort: 80
+              protocol: TCP
+          volumeMounts:
+            - name: nginx-config
+              mountPath: /etc/nginx/nginx.conf
+              subPath: nginx.conf
+              readOnly: true
+          resources:
+            requests:
+              memory: "32Mi"
+              cpu: "10m"
+            limits:
+              memory: "64Mi"
+              cpu: "50m"
+          securityContext:
+            allowPrivilegeEscalation: false
+            runAsNonRoot: true
+            runAsUser: 101
+            capabilities:
+              drop:
+                - ALL
+      volumes:
+        - name: config-volume
+          configMap:
+            name: openwebui-config
+            items:
+              - key: config.yaml
+                path: config.yaml
+        - name: models-config
+          configMap:
+            name: openwebui-models
+            items:
+              - key: models.json
+                path: models.json
+              - key: init-models.sh
+                path: init-models.sh
+                mode: 0755
+        - name: nginx-config
+          configMap:
+            name: openwebui-config
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        - name: data-storage
+          persistentVolumeClaim:
+            claimName: openwebui-data
+        - name: logs-storage
+          emptyDir: {}
+        - name: temp-dir
+          emptyDir: {}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst

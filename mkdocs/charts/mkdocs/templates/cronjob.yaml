@@ -1,0 +1,122 @@
+{{- if .Values.processor.enabled }}
+apiVersion: batch/v1
+kind: CronJob
+metadata:
+  name: {{ include "mkdocs.fullname" . }}-processor
+  namespace: {{ .Release.Namespace }}
+  labels:
+    {{- include "mkdocs.labels" . | nindent 4 }}
+    app.kubernetes.io/component: processor
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Procesador automático de conversaciones para MkDocs"
+spec:
+  schedule: {{ .Values.processor.schedule | quote }}
+  concurrencyPolicy: Forbid
+  successfulJobsHistoryLimit: 3
+  failedJobsHistoryLimit: 3
+  jobTemplate:
+    metadata:
+      labels:
+        {{- include "mkdocs.selectorLabels" . | nindent 8 }}
+        app.kubernetes.io/component: processor
+    spec:
+      template:
+        metadata:
+          labels:
+            {{- include "mkdocs.selectorLabels" . | nindent 12 }}
+            app.kubernetes.io/component: processor
+          annotations:
+            demo.minikube/optimized: "true"
+        spec:
+          restartPolicy: OnFailure
+          {{- if .Values.serviceAccount.create }}
+          serviceAccountName: {{ include "mkdocs.serviceAccountName" . }}
+          {{- end }}
+          securityContext:
+            {{- toYaml .Values.podSecurityContext | nindent 12 }}
+          containers:
+          - name: conversation-processor
+            image: "{{ .Values.processor.image.repository }}:{{ .Values.processor.image.tag }}"
+            imagePullPolicy: {{ .Values.processor.image.pullPolicy }}
+            env:
+            - name: INTEGRATION_API_URL
+              value: {{ .Values.env.INTEGRATION_API_URL | quote }}
+            - name: BACKSTAGE_API_URL
+              value: {{ .Values.env.BACKSTAGE_API_URL | quote }}
+            - name: DOCS_OUTPUT_PATH
+              value: {{ .Values.env.DOCS_OUTPUT_PATH | quote }}
+            - name: LOG_LEVEL
+              value: {{ .Values.env.LOG_LEVEL | quote }}
+            {{- if .Values.secrets.integrationTokens.enabled }}
+            - name: INTEGRATION_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mkdocs.fullname" . }}-secrets
+                  key: integration-token
+            - name: BACKSTAGE_TOKEN
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "mkdocs.fullname" . }}-secrets
+                  key: backstage-token
+            {{- end }}
+            volumeMounts:
+            {{- if .Values.configMaps.processorConfig.enabled }}
+            - name: processor-config
+              mountPath: {{ .Values.configMaps.processorConfig.mountPath }}
+            {{- end }}
+            {{- if .Values.configMaps.templates.enabled }}
+            - name: templates
+              mountPath: {{ .Values.configMaps.templates.mountPath }}
+            {{- end }}
+            - name: docs-source
+              mountPath: /app/docs-source
+            - name: data
+              mountPath: /app/data
+            resources:
+              {{- toYaml .Values.processor.resources | nindent 14 }}
+            securityContext:
+              {{- toYaml .Values.securityContext | nindent 14 }}
+            command:
+            - /bin/bash
+            - -c
+            - |
+              echo "Iniciando procesamiento de conversaciones..."
+              echo "Timestamp: $(date)"
+              
+              # Crear directorios necesarios
+              mkdir -p /app/docs-source /app/data /app/templates
+              
+              # Ejecutar procesador de conversaciones
+              cd /app
+              python3 /app/processors/conversation_processor.py
+              
+              # Verificar que se generaron archivos
+              if [ -f /app/docs-source/index.md ]; then
+                echo "✅ Documentación generada exitosamente"
+                echo "Archivos generados:"
+                find /app/docs-source -name "*.md" -type f | head -10
+              else
+                echo "❌ Error: No se generó documentación"
+                exit 1
+              fi
+              
+              echo "Procesamiento completado: $(date)"
+          volumes:
+          {{- if .Values.configMaps.processorConfig.enabled }}
+          - name: processor-config
+            configMap:
+              name: {{ include "mkdocs.fullname" . }}-processor-config
+          {{- end }}
+          {{- if .Values.configMaps.templates.enabled }}
+          - name: templates
+            configMap:
+              name: {{ include "mkdocs.fullname" . }}-templates
+          {{- end }}
+          - name: docs-source
+            persistentVolumeClaim:
+              claimName: {{ include "mkdocs.fullname" . }}-docs-pvc
+          - name: data
+            persistentVolumeClaim:
+              claimName: {{ include "mkdocs.fullname" . }}-data-pvc
+{{- end }}

@@ -1,0 +1,134 @@
+# OpenWebUI Helm Chart Values - Development Environment
+# Configuración optimizada para desarrollo local
+
+# Configuración de réplicas (desarrollo)
+replicaCount: 1
+
+# Configuración de recursos (desarrollo - más generosos)
+resources:
+  limits:
+    cpu: 1000m
+    memory: 1Gi
+  requests:
+    cpu: 200m
+    memory: 512Mi
+
+# Autoscaling deshabilitado en desarrollo
+autoscaling:
+  enabled: false
+
+# Configuración de Ingress para desarrollo
+ingress:
+  enabled: true
+  className: "nginx"
+  hosts:
+    - host: openwebui.dev.local
+      paths:
+        - path: /
+          pathType: Prefix
+          service: openwebui
+          port: 80
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "false"
+    nginx.ingress.kubernetes.io/proxy-body-size: "100m"  # Más generoso para desarrollo
+
+# Configuración de almacenamiento (desarrollo)
+persistence:
+  enabled: true
+  size: 5Gi  # Más espacio para desarrollo
+  models:
+    enabled: true
+    size: 3Gi
+
+# Configuración de OpenWebUI para desarrollo
+openwebui:
+  name: "OpenWebUI Development"
+  auth:
+    enabled: true
+    enableSignup: true
+    defaultUserRole: "admin"  # Admin por defecto en desarrollo
+  features:
+    chat: true
+    fileUpload: true
+    codeExecution: true  # Habilitado en desarrollo
+    webSearch: true     # Habilitado en desarrollo
+    imageGeneration: false
+  upload:
+    maxFileSize: "52428800"  # 50MB para desarrollo
+  ai:
+    providers:
+      ollama:
+        enabled: true
+        baseUrl: "http://ollama:11434"
+      openai:
+        enabled: true  # Habilitado en desarrollo
+        apiKey: "your-openai-api-key-here"
+
+# Configuración de PostgreSQL para desarrollo
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "dev-postgres-123"
+    username: "openwebui_dev"
+    password: "dev-openwebui-123"
+    database: "openwebui_dev"
+  primary:
+    resources:
+      limits:
+        cpu: 500m
+        memory: 512Mi
+      requests:
+        cpu: 100m
+        memory: 256Mi
+    persistence:
+      enabled: true
+      size: 3Gi
+
+# Network policies más permisivas para desarrollo
+networkPolicy:
+  enabled: false  # Deshabilitado para facilitar desarrollo
+
+# Configuración de logging más verbosa
+logging:
+  level: "DEBUG"
+  format: "pretty"
+
+# Variables de entorno adicionales para desarrollo
+extraEnvVars:
+  - name: NODE_ENV
+    value: "development"
+  - name: DEBUG
+    value: "true"
+  - name: ENABLE_DEV_TOOLS
+    value: "true"
+
+# Labels específicos para desarrollo
+commonLabels:
+  environment: development
+  demo.minikube: "true"
+  app.kubernetes.io/part-of: backstage-openwebui-demo
+
+commonAnnotations:
+  demo.minikube/environment: "development"
+  demo.minikube/debug: "enabled"
+
+# Configuración específica para desarrollo
+demo:
+  enabled: true
+  minikube:
+    optimized: false  # Menos optimizado, más funcional
+    resourceLimits: false
+    networkPolicies: disabled
+  backstageIntegration:
+    enabled: true
+    crossNamespace: true
+  sampleData:
+    enabled: true
+    users:
+      - email: "dev@example.com"
+        password: "dev123"
+        role: "admin"
+      - email: "test@example.com"
+        password: "test123"
+        role: "user"

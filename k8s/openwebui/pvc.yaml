@@ -1,0 +1,43 @@
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-data
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: storage
+    demo.minikube: "true"
+    app.kubernetes.io/name: openwebui-data
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Almacenamiento persistente para datos de OpenWebUI"
+    demo.minikube/size: "2Gi"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: standard  # Minikube default storage class
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: openwebui-models
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: models-storage
+    demo.minikube: "true"
+  annotations:
+    demo.minikube/description: "Almacenamiento para modelos de AI"
+    demo.minikube/size: "1Gi"
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 1Gi
+  storageClassName: standard

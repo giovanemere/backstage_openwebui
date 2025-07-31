@@ -1,0 +1,174 @@
+# =============================================================================
+# Jenkins Configuration as Code (JCasC) - Demo Configuration
+# =============================================================================
+# Configuración completa de Jenkins para el demo usando JCasC
+
+jenkins:
+  systemMessage: "Jenkins para Demo Backstage + OpenWebUI - Optimizado para Minikube"
+  numExecutors: 2
+  mode: NORMAL
+  scmCheckoutRetryCount: 3
+  
+  # Configuración de seguridad
+  securityRealm:
+    local:
+      allowsSignup: false
+      users:
+        - id: "admin"
+          password: "demo123"
+          properties:
+            - "hudson.security.HudsonPrivateSecurityRealm$Details":
+                passwordHash: "#jbcrypt:$2a$10$DdaWzN64JgUtLdvxWIflcuQu2fgrrMSAMabF5TSrGK5nXitqK9ZMS"
+        - id: "demo"
+          password: "demo123"
+          properties:
+            - "hudson.security.HudsonPrivateSecurityRealm$Details":
+                passwordHash: "#jbcrypt:$2a$10$DdaWzN64JgUtLdvxWIflcuQu2fgrrMSAMabF5TSrGK5nXitqK9ZMS"
+
+  authorizationStrategy:
+    loggedInUsersCanDoAnything:
+      allowAnonymousRead: false
+
+  # Configuración de clouds (Kubernetes)
+  clouds:
+    - kubernetes:
+        name: "minikube"
+        serverUrl: "https://kubernetes.default.svc.cluster.local"
+        namespace: "jenkins"
+        jenkinsUrl: "http://jenkins:8080/jenkins"
+        jenkinsTunnel: "jenkins:50000"
+        containerCapStr: "10"
+        retentionTimeout: 5
+        connectTimeout: 10
+        readTimeout: 20
+        templates:
+          - name: "jenkins-agent"
+            namespace: "jenkins"
+            label: "jenkins-agent"
+            nodeUsageMode: "NORMAL"
+            containers:
+              - name: "jnlp"
+                image: "jenkins/inbound-agent:latest"
+                workingDir: "/home/jenkins/agent"
+                resourceRequestMemory: "256Mi"
+                resourceLimitMemory: "512Mi"
+                resourceRequestCpu: "100m"
+                resourceLimitCpu: "500m"
+            volumes:
+              - hostPathVolume:
+                  hostPath: "/var/run/docker.sock"
+                  mountPath: "/var/run/docker.sock"
+
+  # Configuración de herramientas
+  globalNodeProperties:
+    - envVars:
+        env:
+          - key: "DOCKER_HOST"
+            value: "unix:///var/run/docker.sock"
+          - key: "MINIKUBE_PROFILE"
+            value: "backstage-demo"
+
+# Configuración de herramientas
+tool:
+  git:
+    installations:
+      - name: "Default"
+        home: "/usr/bin/git"
+  
+  dockerTool:
+    installations:
+      - name: "docker"
+        home: "/usr/bin/docker"
+
+# Configuración de credenciales
+credentials:
+  system:
+    domainCredentials:
+      - credentials:
+          - usernamePassword:
+              scope: GLOBAL
+              id: "dockerhub-credentials"
+              username: "edissonz8809"
+              password: "demo-password"
+              description: "DockerHub credentials for demo"
+          - string:
+              scope: GLOBAL
+              id: "minikube-token"
+              secret: "demo-token"
+              description: "Minikube service account token"
+
+# Configuración de trabajos semilla
+jobs:
+  - script: |
+      folder('Demo') {
+        displayName('Demo Pipelines')
+        description('Pipelines para el demo Backstage + OpenWebUI')
+      }
+      
+      pipelineJob('Demo/backstage-build') {
+        displayName('Backstage Build & Deploy')
+        description('Pipeline para construir y desplegar Backstage')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/edissonz8809/iaops.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/pipelines/backstage-pipeline.groovy')
+          }
+        }
+      }
+      
+      pipelineJob('Demo/openwebui-build') {
+        displayName('OpenWebUI Build & Deploy')
+        description('Pipeline para construir y desplegar OpenWebUI')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/edissonz8809/iaops.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/pipelines/openwebui-pipeline.groovy')
+          }
+        }
+      }
+      
+      pipelineJob('Demo/full-deploy') {
+        displayName('Full Demo Deploy')
+        description('Pipeline completo para desplegar todo el demo')
+        definition {
+          cpsScm {
+            scm {
+              git {
+                remote {
+                  url('https://github.com/edissonz8809/iaops.git')
+                }
+                branch('*/main')
+              }
+            }
+            scriptPath('jenkins/pipelines/full-deploy-pipeline.groovy')
+          }
+        }
+      }
+
+# Configuración de apariencia
+appearance:
+  theme: "dark"
+
+# Configuración de ubicación
+location:
+  adminAddress: "demo@example.com"
+  url: "http://jenkins:8080/jenkins"
+
+# Configuración de seguridad adicional
+security:
+  globalJobDslSecurityConfiguration:
+    useScriptSecurity: false

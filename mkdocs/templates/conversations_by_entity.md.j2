@@ -1,0 +1,216 @@
+# Conversaciones por Entidad
+
+Esta página organiza todas las conversaciones agrupadas por las entidades del catálogo de Backstage.
+
+## 📊 Resumen por Entidades
+
+- **Entidades con Conversaciones**: {{ entity_sessions|length }}
+- **Total de Conversaciones**: {{ entity_sessions.values()|sum(attribute='length') if entity_sessions else 0 }}
+
+{% if entity_sessions %}
+
+## 🗂️ Conversaciones por Entidad
+
+{% for entity_ref, sessions in entity_sessions.items() %}
+{% set entity_parts = entity_ref.split(':') %}
+{% set kind = entity_parts[0] %}
+{% set namespace_name = entity_parts[1].split('/') if entity_parts|length > 1 else ['default', 'unknown'] %}
+{% set namespace = namespace_name[0] %}
+{% set name = namespace_name[1] if namespace_name|length > 1 else namespace_name[0] %}
+
+### {{ kind }}: {{ name }}
+
+**Namespace**: `{{ namespace }}`  
+**Conversaciones**: {{ sessions|length }}  
+**Total de Mensajes**: {{ sessions|sum(attribute='messages')|length }}
+
+{% for session in sessions|sort(attribute='updated_at', reverse=true) %}
+
+#### 💬 {{ session.title }}
+
+**Fecha**: {{ session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at }}  
+**Mensajes**: {{ session.messages|length }}  
+**Usuario**: {{ session.user_context.get('display_name', session.user_context.get('user_id', 'Anónimo')) if session.user_context }}
+
+{% if session.summary %}
+**Resumen**: {{ session.summary }}
+{% endif %}
+
+{% if session.insights %}
+**Insights**: {% for insight in session.insights %}`{{ insight }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+
+{% if session.tags %}
+**Tags**: {% for tag in session.tags %}`{{ tag }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+
+??? abstract "Ver Conversación Completa"
+    {% for message in session.messages %}
+    {% if message.role == 'user' %}
+    **👤 Usuario** ({{ message.timestamp.strftime('%H:%M') }}):
+    > {{ message.content }}
+    
+    {% elif message.role == 'assistant' %}
+    **🤖 Asistente** ({{ message.timestamp.strftime('%H:%M') }}):
+    > {{ message.content }}
+    
+    {% elif message.role == 'system' %}
+    **⚙️ Sistema** ({{ message.timestamp.strftime('%H:%M') }}):
+    > {{ message.content }}
+    
+    {% endif %}
+    {% endfor %}
+
+---
+
+{% endfor %}
+
+{% endfor %}
+
+{% else %}
+
+!!! warning "Sin Conversaciones por Entidad"
+    No se encontraron conversaciones asociadas a entidades específicas. Esto puede deberse a:
+    
+    - Las conversaciones no tienen contexto de entidad asignado
+    - Error en el procesamiento de contexto
+    - No hay conversaciones registradas en el sistema
+    
+    Para que las conversaciones aparezcan aquí, deben iniciarse desde el contexto de una entidad específica en Backstage.
+
+{% endif %}
+
+## 📈 Estadísticas por Tipo de Entidad
+
+{% if entity_sessions %}
+{% set entity_types = {} %}
+{% for entity_ref, sessions in entity_sessions.items() %}
+  {% set kind = entity_ref.split(':')[0] %}
+  {% if kind not in entity_types %}
+    {% set _ = entity_types.update({kind: {'count': 0, 'conversations': 0, 'messages': 0}}) %}
+  {% endif %}
+  {% set _ = entity_types[kind].update({
+    'count': entity_types[kind]['count'] + 1,
+    'conversations': entity_types[kind]['conversations'] + sessions|length,
+    'messages': entity_types[kind]['messages'] + (sessions|sum(attribute='messages')|length)
+  }) %}
+{% endfor %}
+
+| Tipo de Entidad | Entidades | Conversaciones | Mensajes | Promedio Msg/Conv |
+|-----------------|-----------|----------------|----------|-------------------|
+{% for kind, stats in entity_types.items()|sort %}
+| **{{ kind }}** | {{ stats.count }} | {{ stats.conversations }} | {{ stats.messages }} | {{ "%.1f"|format(stats.messages / stats.conversations if stats.conversations > 0 else 0) }} |
+{% endfor %}
+
+{% endif %}
+
+## 🔍 Entidades Más Activas
+
+{% if entity_sessions %}
+{% set sorted_entities = entity_sessions.items()|sort(attribute='1', key=lambda x: x|length, reverse=true) %}
+
+### Top 10 por Número de Conversaciones
+
+| Entidad | Tipo | Conversaciones | Mensajes |
+|---------|------|----------------|----------|
+{% for entity_ref, sessions in sorted_entities[:10] %}
+{% set entity_parts = entity_ref.split(':') %}
+{% set kind = entity_parts[0] %}
+{% set name = entity_parts[1].split('/')[-1] if entity_parts|length > 1 else 'unknown' %}
+| {{ name }} | {{ kind }} | {{ sessions|length }} | {{ sessions|sum(attribute='messages')|length }} |
+{% endfor %}
+
+### Entidades con Conversaciones Más Largas
+
+{% set entities_by_messages = [] %}
+{% for entity_ref, sessions in entity_sessions.items() %}
+  {% set total_messages = sessions|sum(attribute='messages')|length %}
+  {% set _ = entities_by_messages.append((entity_ref, sessions, total_messages)) %}
+{% endfor %}
+
+| Entidad | Tipo | Conversaciones | Total Mensajes | Promedio por Conversación |
+|---------|------|----------------|----------------|---------------------------|
+{% for entity_ref, sessions, total_messages in entities_by_messages|sort(attribute=2, reverse=true)[:10] %}
+{% set entity_parts = entity_ref.split(':') %}
+{% set kind = entity_parts[0] %}
+{% set name = entity_parts[1].split('/')[-1] if entity_parts|length > 1 else 'unknown' %}
+| {{ name }} | {{ kind }} | {{ sessions|length }} | {{ total_messages }} | {{ "%.1f"|format(total_messages / sessions|length) }} |
+{% endfor %}
+
+{% endif %}
+
+## 🏷️ Tags Más Utilizados por Entidad
+
+{% if entity_sessions %}
+{% set entity_tags = {} %}
+{% for entity_ref, sessions in entity_sessions.items() %}
+  {% set all_tags = [] %}
+  {% for session in sessions %}
+    {% if session.tags %}
+      {% for tag in session.tags %}
+        {% set _ = all_tags.append(tag) %}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+  {% if all_tags %}
+    {% set tag_counts = {} %}
+    {% for tag in all_tags %}
+      {% set _ = tag_counts.update({tag: tag_counts.get(tag, 0) + 1}) %}
+    {% endfor %}
+    {% set _ = entity_tags.update({entity_ref: tag_counts}) %}
+  {% endif %}
+{% endfor %}
+
+{% if entity_tags %}
+### Tags por Entidad
+
+{% for entity_ref, tag_counts in entity_tags.items() %}
+{% set entity_parts = entity_ref.split(':') %}
+{% set kind = entity_parts[0] %}
+{% set name = entity_parts[1].split('/')[-1] if entity_parts|length > 1 else 'unknown' %}
+
+**{{ kind }}: {{ name }}**  
+Tags: {% for tag, count in tag_counts.items()|sort(attribute=1, reverse=true)[:5] %}`{{ tag }}` ({{ count }}){% if not loop.last %}, {% endif %}{% endfor %}
+
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+## 💡 Insights por Entidad
+
+{% if entity_sessions %}
+{% for entity_ref, sessions in entity_sessions.items() %}
+{% set entity_parts = entity_ref.split(':') %}
+{% set kind = entity_parts[0] %}
+{% set name = entity_parts[1].split('/')[-1] if entity_parts|length > 1 else 'unknown' %}
+
+{% set all_insights = [] %}
+{% for session in sessions %}
+  {% if session.insights %}
+    {% for insight in session.insights %}
+      {% set _ = all_insights.append(insight) %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if all_insights %}
+### {{ kind }}: {{ name }}
+
+{% set insight_counts = {} %}
+{% for insight in all_insights %}
+  {% set _ = insight_counts.update({insight: insight_counts.get(insight, 0) + 1}) %}
+{% endfor %}
+
+**Patrones identificados**:
+{% for insight, count in insight_counts.items()|sort(attribute=1, reverse=true)[:3] %}
+- {{ insight }} ({{ count }} veces)
+{% endfor %}
+
+{% endif %}
+{% endfor %}
+{% endif %}
+
+---
+
+*Documentación generada automáticamente el {{ generated_at.strftime('%d de %B de %Y a las %H:%M') }}*

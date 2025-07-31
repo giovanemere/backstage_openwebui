@@ -1,0 +1,105 @@
+# =============================================================================
+# Backstage Helm Values - Entorno de Desarrollo
+# =============================================================================
+
+# Configuración específica para desarrollo
+replicaCount: 1
+
+# Imagen de desarrollo
+image:
+  registry: edissonz8809/iaops
+  repository: backstage
+  tag: "dev-latest"
+  pullPolicy: Always
+
+# Recursos mínimos para desarrollo
+resources:
+  limits:
+    cpu: 300m
+    memory: 384Mi
+  requests:
+    cpu: 50m
+    memory: 192Mi
+
+# Configuración de desarrollo
+backstage:
+  app:
+    title: "Backstage Dev"
+    baseUrl: "http://localhost:7007"
+  
+  backend:
+    baseUrl: "http://localhost:7007"
+    cors:
+      origin: ["http://localhost:3000", "http://localhost:7007"]
+      credentials: true
+  
+  auth:
+    environment: "development"
+    providers:
+      guest:
+        dangerouslyAllowOutsideDevelopment: true
+
+# PostgreSQL para desarrollo
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "dev123"
+    username: "backstage"
+    password: "dev123"
+    database: "backstage"
+  primary:
+    resources:
+      limits:
+        cpu: 200m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 1Gi
+
+# Ingress deshabilitado para desarrollo local
+ingress:
+  enabled: false
+
+# Autoscaling deshabilitado
+autoscaling:
+  enabled: false
+
+# Network policy permisiva para desarrollo
+networkPolicy:
+  enabled: false
+
+# Configuración de desarrollo
+demo:
+  enabled: true
+  minikube:
+    profile: "backstage-dev"
+    namespace: "backstage-dev"
+  
+  optimization:
+    enabled: true
+    memory:
+      limit: "384Mi"
+      request: "192Mi"
+    cpu:
+      limit: "300m"
+      request: "50m"
+
+# Features para desarrollo
+  features:
+    kubernetes: true
+    techdocs: true
+    catalog: true
+    scaffolder: true
+    openwebui: false  # Deshabilitado por defecto en dev
+
+# Configuración de debug
+debug:
+  enabled: true
+  logLevel: "debug"
+
+# Hot reload para desarrollo
+hotReload:
+  enabled: true

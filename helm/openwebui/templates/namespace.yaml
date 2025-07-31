@@ -1,0 +1,12 @@
+{{- if .Values.namespaceOverride }}
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    name: {{ include "openwebui.namespace" . }}
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+    demo.minikube/description: "Namespace para OpenWebUI con integración Backstage"
+{{- end }}

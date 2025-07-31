@@ -1,0 +1,316 @@
+# Configuración de Integración Backstage-OpenWebUI
+# Configuración centralizada para la comunicación entre servicios
+
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: backstage-openwebui-integration
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-config
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: config
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Configuración de integración entre Backstage y OpenWebUI"
+data:
+  # Configuración principal de integración
+  integration.yaml: |
+    integration:
+      name: "Backstage-OpenWebUI Integration"
+      version: "1.0.0"
+      description: "Integración técnica entre Backstage y OpenWebUI para demo"
+      
+      # Configuración de servicios
+      services:
+        backstage:
+          name: "backstage"
+          namespace: "backstage-demo"
+          service: "backstage"
+          port: 7007
+          protocol: "http"
+          base_url: "http://backstage.backstage-demo.svc.cluster.local:7007"
+          health_endpoint: "/api/catalog/health"
+          api_endpoints:
+            catalog: "/api/catalog"
+            entities: "/api/catalog/entities"
+            locations: "/api/catalog/locations"
+            techdocs: "/api/techdocs"
+            auth: "/api/auth"
+            proxy: "/api/proxy"
+          
+        openwebui:
+          name: "openwebui"
+          namespace: "openwebui-demo"
+          service: "openwebui"
+          port: 8080
+          protocol: "http"
+          base_url: "http://openwebui.openwebui-demo.svc.cluster.local:8080"
+          health_endpoint: "/health"
+          api_endpoints:
+            chat: "/api/chat"
+            models: "/api/models"
+            users: "/api/users"
+            files: "/api/files"
+            webhooks: "/api/webhooks"
+      
+      # Configuración de comunicación
+      communication:
+        # Configuración de API calls
+        api:
+          timeout: 30
+          retries: 3
+          retry_delay: 5
+          headers:
+            User-Agent: "Backstage-OpenWebUI-Integration/1.0"
+            Content-Type: "application/json"
+            Accept: "application/json"
+        
+        # Configuración de webhooks
+        webhooks:
+          enabled: true
+          timeout: 15
+          retry_attempts: 3
+          endpoints:
+            backstage_to_openwebui: "/api/webhooks/backstage"
+            openwebui_to_backstage: "/api/webhooks/openwebui"
+        
+        # Configuración de autenticación
+        auth:
+          method: "token"
+          token_header: "Authorization"
+          token_prefix: "Bearer"
+          
+      # Configuración de features
+      features:
+        # Chat integration
+        chat:
+          enabled: true
+          context_sharing: true
+          entity_context: true
+          catalog_integration: true
+          
+        # Entity enrichment
+        entity_enrichment:
+          enabled: true
+          ai_descriptions: true
+          documentation_generation: true
+          relationship_analysis: true
+          
+        # Workflow integration
+        workflows:
+          enabled: true
+          template_generation: true
+          scaffolding_assistance: true
+          
+        # Documentation integration
+        documentation:
+          enabled: true
+          auto_generation: true
+          ai_enhancement: true
+          
+      # Configuración de datos compartidos
+      data_sharing:
+        # Entidades de Backstage compartidas con OpenWebUI
+        backstage_entities:
+          - components
+          - apis
+          - resources
+          - systems
+          - domains
+          - users
+          - groups
+          
+        # Contexto de OpenWebUI compartido con Backstage
+        openwebui_context:
+          - chat_history
+          - user_preferences
+          - model_usage
+          - generated_content
+          
+      # Configuración de logging
+      logging:
+        level: "INFO"
+        format: "json"
+        include_request_id: true
+        include_user_context: true
+        
+      # Configuración de métricas
+      metrics:
+        enabled: true
+        endpoint: "/metrics"
+        include_integration_metrics: true
+        include_performance_metrics: true
+
+  # Configuración de endpoints específicos
+  endpoints.yaml: |
+    endpoints:
+      # Endpoints de Backstage para OpenWebUI
+      backstage_for_openwebui:
+        # Obtener información de entidades
+        get_entity:
+          method: "GET"
+          path: "/api/catalog/entities/by-name/{kind}/{namespace}/{name}"
+          description: "Obtener información de una entidad específica"
+          
+        # Buscar entidades
+        search_entities:
+          method: "GET"
+          path: "/api/catalog/entities"
+          description: "Buscar entidades con filtros"
+          parameters:
+            - name: "filter"
+              type: "query"
+              description: "Filtros de búsqueda"
+            - name: "fields"
+              type: "query"
+              description: "Campos a incluir"
+              
+        # Obtener documentación técnica
+        get_techdocs:
+          method: "GET"
+          path: "/api/techdocs/{namespace}/{kind}/{name}"
+          description: "Obtener documentación técnica de una entidad"
+          
+        # Obtener información de usuario
+        get_user_info:
+          method: "GET"
+          path: "/api/auth/user"
+          description: "Obtener información del usuario actual"
+          
+      # Endpoints de OpenWebUI para Backstage
+      openwebui_for_backstage:
+        # Iniciar chat con contexto
+        start_chat:
+          method: "POST"
+          path: "/api/chat/start"
+          description: "Iniciar chat con contexto de Backstage"
+          body:
+            entity_context: "object"
+            user_context: "object"
+            initial_message: "string"
+            
+        # Generar contenido
+        generate_content:
+          method: "POST"
+          path: "/api/generate"
+          description: "Generar contenido basado en entidades"
+          body:
+            template: "string"
+            entities: "array"
+            context: "object"
+            
+        # Obtener historial de chat
+        get_chat_history:
+          method: "GET"
+          path: "/api/chat/history"
+          description: "Obtener historial de chat del usuario"
+          parameters:
+            - name: "entity_id"
+              type: "query"
+              description: "ID de entidad para filtrar"
+              
+        # Webhook para eventos de Backstage
+        backstage_webhook:
+          method: "POST"
+          path: "/api/webhooks/backstage"
+          description: "Recibir eventos de Backstage"
+          body:
+            event_type: "string"
+            entity: "object"
+            user: "object"
+            timestamp: "string"
+
+  # Configuración de mapeo de datos
+  data_mapping.yaml: |
+    data_mapping:
+      # Mapeo de entidades de Backstage a contexto de OpenWebUI
+      backstage_to_openwebui:
+        component:
+          name: "metadata.name"
+          description: "metadata.description"
+          type: "spec.type"
+          lifecycle: "spec.lifecycle"
+          owner: "spec.owner"
+          system: "spec.system"
+          tags: "metadata.tags"
+          links: "metadata.links"
+          
+        api:
+          name: "metadata.name"
+          description: "metadata.description"
+          type: "spec.type"
+          lifecycle: "spec.lifecycle"
+          owner: "spec.owner"
+          system: "spec.system"
+          definition: "spec.definition"
+          
+        resource:
+          name: "metadata.name"
+          description: "metadata.description"
+          type: "spec.type"
+          owner: "spec.owner"
+          system: "spec.system"
+          
+        system:
+          name: "metadata.name"
+          description: "metadata.description"
+          owner: "spec.owner"
+          domain: "spec.domain"
+          
+        domain:
+          name: "metadata.name"
+          description: "metadata.description"
+          owner: "spec.owner"
+          
+        user:
+          name: "metadata.name"
+          display_name: "spec.profile.displayName"
+          email: "spec.profile.email"
+          
+        group:
+          name: "metadata.name"
+          display_name: "spec.profile.displayName"
+          description: "metadata.description"
+          type: "spec.type"
+          members: "spec.members"
+          
+      # Mapeo de contexto de OpenWebUI a Backstage
+      openwebui_to_backstage:
+        chat_context:
+          entity_reference: "entity.ref"
+          entity_kind: "entity.kind"
+          entity_name: "entity.name"
+          entity_namespace: "entity.namespace"
+          user_id: "user.id"
+          session_id: "session.id"
+          
+        generated_content:
+          content_type: "type"
+          content: "content"
+          entity_context: "context.entity"
+          user_context: "context.user"
+          model_used: "model"
+          timestamp: "created_at"
+
+---
+# Secret para tokens de integración
+apiVersion: v1
+kind: Secret
+metadata:
+  name: backstage-openwebui-integration-secrets
+  namespace: integration-demo
+  labels:
+    app.kubernetes.io/name: integration-secrets
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+    integration.demo/component: secrets
+type: Opaque
+data:
+  # Tokens de integración (base64 encoded)
+  # backstage-api-token: demo-backstage-integration-token
+  # openwebui-api-token: demo-openwebui-integration-token
+  # webhook-secret: demo-webhook-secret-key
+  BACKSTAGE_API_TOKEN: ZGVtby1iYWNrc3RhZ2UtaW50ZWdyYXRpb24tdG9rZW4=
+  OPENWEBUI_API_TOKEN: ZGVtby1vcGVud2VidWktaW50ZWdyYXRpb24tdG9rZW4=
+  WEBHOOK_SECRET: ZGVtby13ZWJob29rLXNlY3JldC1rZXk=
+  INTEGRATION_JWT_SECRET: ZGVtby1pbnRlZ3JhdGlvbi1qd3Qtc2VjcmV0

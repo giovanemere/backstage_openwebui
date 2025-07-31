@@ -1,0 +1,46 @@
+# Backstage Production Configuration - Demo Minikube
+app:
+  # Should be the same as backend.baseUrl when using the `app-backend` plugin.
+  baseUrl: http://backstage:7007
+
+backend:
+  baseUrl: http://backstage:7007
+  listen:
+    port: 7007
+    host: 0.0.0.0
+  
+  # Production database configuration
+  database:
+    client: pg
+    connection:
+      host: postgresql
+      port: 5432
+      user: backstage
+      password: demo-backstage-password
+      database: backstage_openwebui
+      ssl: false # For demo only, use SSL in real production
+
+# Demo-specific configurations for Minikube
+proxy:
+  # OpenWebUI Integration for production
+  '/openwebui':
+    target: 'http://openwebui:8080'
+    changeOrigin: true
+    pathRewrite:
+      '^/openwebui': ''
+    headers:
+      X-Forwarded-For: $remote_addr
+      X-Forwarded-Proto: $scheme
+      X-Demo-Mode: 'true'
+
+auth:
+  environment: production
+  providers:
+    # Simplified auth for demo
+    guest:
+      dangerouslyAllowOutsideDevelopment: true
+
+# Logging configuration for production
+logging:
+  level: info
+  format: json

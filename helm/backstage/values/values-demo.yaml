@@ -1,0 +1,206 @@
+# =============================================================================
+# Backstage Helm Values - Entorno de Demo
+# =============================================================================
+
+# Configuración específica para demo
+replicaCount: 1
+
+# Imagen de demo
+image:
+  registry: edissonz8809/iaops
+  repository: backstage
+  tag: "demo-latest"
+  pullPolicy: IfNotPresent
+
+# Recursos optimizados para demo en Minikube
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Configuración de demo
+backstage:
+  app:
+    title: "Backstage Demo - IA Ops"
+    baseUrl: "http://backstage:7007"
+  
+  organization:
+    name: "Demo Organization - IA Ops"
+  
+  backend:
+    baseUrl: "http://backstage:7007"
+    cors:
+      origin: "http://localhost:3000"
+      credentials: true
+  
+  auth:
+    environment: "development"
+    providers:
+      guest:
+        dangerouslyAllowOutsideDevelopment: true
+
+# PostgreSQL para demo
+postgresql:
+  enabled: true
+  auth:
+    postgresPassword: "demo123"
+    username: "backstage"
+    password: "demo123"
+    database: "backstage"
+  primary:
+    resources:
+      limits:
+        cpu: 250m
+        memory: 256Mi
+      requests:
+        cpu: 50m
+        memory: 128Mi
+    persistence:
+      enabled: true
+      size: 2Gi
+
+# Ingress habilitado para demo
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/use-regex: "true"
+    nginx.ingress.kubernetes.io/proxy-body-size: "50m"
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Accept-Encoding "";
+      sub_filter '<head>' '<head><base href="/backstage/">';
+      sub_filter_once on;
+  hosts:
+    - host: ""
+      paths:
+        - path: /backstage(/|$)(.*)
+          pathType: Prefix
+
+# Autoscaling limitado para demo
+autoscaling:
+  enabled: false
+  minReplicas: 1
+  maxReplicas: 2
+  targetCPUUtilizationPercentage: 70
+
+# Network policy habilitada
+networkPolicy:
+  enabled: true
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 7007
+    - from:
+        - podSelector:
+            matchLabels:
+              app: openwebui
+      ports:
+        - protocol: TCP
+          port: 7007
+  egress:
+    - to:
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+
+# Configuración específica de demo
+demo:
+  enabled: true
+  minikube:
+    profile: "backstage-demo"
+    namespace: "backstage-demo"
+  
+  optimization:
+    enabled: true
+    memory:
+      limit: "512Mi"
+      request: "256Mi"
+    cpu:
+      limit: "500m"
+      request: "100m"
+  
+  features:
+    kubernetes: true
+    techdocs: true
+    catalog: true
+    scaffolder: true
+    openwebui: true
+
+# Integración con OpenWebUI habilitada
+openwebui:
+  enabled: true
+  url: "http://openwebui:8080"
+  integration:
+    enabled: true
+    proxy: true
+
+# Kubernetes plugin configurado para Minikube
+kubernetes:
+  enabled: true
+  serviceLocatorMethod:
+    type: "multiTenant"
+  clusterLocatorMethods:
+    - type: "config"
+      clusters:
+        - url: "https://kubernetes.default.svc.cluster.local"
+          name: "minikube-demo"
+          authProvider: "serviceAccount"
+          skipTLSVerify: true
+          skipMetricsLookup: false
+
+# Secrets para demo
+secrets:
+  github:
+    token: "demo-github-token"
+  openwebui:
+    token: "demo-openwebui-token"
+
+# Health checks optimizados para demo
+livenessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /api/catalog/health
+    port: 7007
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Configuración de nodos para Minikube
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Configuración de seguridad
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  runAsGroup: 1001
+  fsGroup: 1001
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1001
+  fsGroup: 1001

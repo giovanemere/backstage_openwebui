@@ -1,0 +1,25 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "postgresql.fullname" . }}
+  labels:
+    {{- include "postgresql.labels" . | nindent 4 }}
+  {{- with .Values.commonAnnotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.service.type }}
+  ports:
+    - port: {{ .Values.service.ports.postgresql }}
+      targetPort: postgresql
+      protocol: TCP
+      name: postgresql
+      {{- if and (eq .Values.service.type "NodePort") .Values.service.nodePorts.postgresql }}
+      nodePort: {{ .Values.service.nodePorts.postgresql }}
+      {{- end }}
+  selector:
+    {{- include "postgresql.selectorLabels" . | nindent 4 }}
+  {{- if .Values.service.sessionAffinity }}
+  sessionAffinity: {{ .Values.service.sessionAffinity }}
+  {{- end }}

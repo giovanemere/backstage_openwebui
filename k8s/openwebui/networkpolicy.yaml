@@ -1,0 +1,160 @@
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: openwebui-network-policy
+  namespace: openwebui-demo
+  labels:
+    app: openwebui
+    component: network-security
+    demo.minikube: "true"
+    app.kubernetes.io/name: openwebui-network-policy
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Network policy para OpenWebUI (permisiva para demo)"
+    demo.minikube/security-level: "demo"
+spec:
+  podSelector:
+    matchLabels:
+      app: openwebui
+  policyTypes:
+    - Ingress
+    - Egress
+  ingress:
+    # Permitir tráfico desde Nginx Ingress Controller
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: ingress-nginx
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 80
+    # Permitir tráfico desde Backstage
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+        - podSelector:
+            matchLabels:
+              app: backstage
+      ports:
+        - protocol: TCP
+          port: 8080
+    # Permitir tráfico interno del namespace
+    - from:
+        - namespaceSelector:
+            matchLabels:
+              name: openwebui-demo
+      ports:
+        - protocol: TCP
+          port: 8080
+        - protocol: TCP
+          port: 80
+    # Permitir health checks desde cualquier lugar (para demo)
+    - ports:
+        - protocol: TCP
+          port: 8080
+  egress:
+    # Permitir conexión a PostgreSQL
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: database-demo
+        - podSelector:
+            matchLabels:
+              app: postgresql
+      ports:
+        - protocol: TCP
+          port: 5432
+    # Permitir conexión a Backstage
+    - to:
+        - namespaceSelector:
+            matchLabels:
+              name: backstage-demo
+        - podSelector:
+            matchLabels:
+              app: backstage
+      ports:
+        - protocol: TCP
+          port: 7007
+    # Permitir DNS resolution
+    - to: []
+      ports:
+        - protocol: UDP
+          port: 53
+        - protocol: TCP
+          port: 53
+    # Permitir conexiones HTTPS para APIs externas (OpenAI, etc.)
+    - to: []
+      ports:
+        - protocol: TCP
+          port: 443
+        - protocol: TCP
+          port: 80
+    # Permitir conexión a Ollama (si está disponible)
+    - to:
+        - podSelector:
+            matchLabels:
+              app: ollama
+      ports:
+        - protocol: TCP
+          port: 11434
+
+---
+# Network policy más restrictiva para producción (comentada por defecto)
+# apiVersion: networking.k8s.io/v1
+# kind: NetworkPolicy
+# metadata:
+#   name: openwebui-network-policy-strict
+#   namespace: openwebui-demo
+#   labels:
+#     app: openwebui
+#     component: network-security-strict
+#     demo.minikube: "true"
+#   annotations:
+#     demo.minikube/description: "Network policy restrictiva para OpenWebUI (producción)"
+#     demo.minikube/security-level: "production"
+# spec:
+#   podSelector:
+#     matchLabels:
+#       app: openwebui
+#   policyTypes:
+#     - Ingress
+#     - Egress
+#   ingress:
+#     # Solo permitir tráfico desde Nginx Ingress Controller
+#     - from:
+#         - namespaceSelector:
+#             matchLabels:
+#               name: ingress-nginx
+#           podSelector:
+#             matchLabels:
+#               app.kubernetes.io/name: ingress-nginx
+#       ports:
+#         - protocol: TCP
+#           port: 8080
+#   egress:
+#     # Solo permitir conexión a base de datos específica
+#     - to:
+#         - namespaceSelector:
+#             matchLabels:
+#               name: database-demo
+#           podSelector:
+#             matchLabels:
+#               app: postgresql
+#       ports:
+#         - protocol: TCP
+#           port: 5432
+#     # DNS resolution
+#     - to:
+#         - namespaceSelector:
+#             matchLabels:
+#               name: kube-system
+#           podSelector:
+#             matchLabels:
+#               k8s-app: kube-dns
+#       ports:
+#         - protocol: UDP
+#           port: 53

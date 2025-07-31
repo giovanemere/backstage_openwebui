@@ -1,0 +1,198 @@
+# =============================================================================
+# Jenkins Helm Chart Values - Optimizado para Demo Minikube
+# =============================================================================
+
+# Configuración global
+global:
+  imageRegistry: ""
+  imagePullSecrets: []
+
+# Configuración de la imagen
+image:
+  registry: edissonz8809/iaops
+  repository: jenkins
+  tag: "demo-latest"
+  pullPolicy: IfNotPresent
+
+# Configuración del servicio
+service:
+  type: ClusterIP
+  port: 8080
+  targetPort: 8080
+  annotations: {}
+
+# Configuración de recursos (optimizado para Minikube)
+resources:
+  limits:
+    cpu: 500m
+    memory: 512Mi
+  requests:
+    cpu: 100m
+    memory: 256Mi
+
+# Configuración de réplicas
+replicaCount: 1
+
+# Configuración de autoscaling (deshabilitado para demo)
+autoscaling:
+  enabled: false
+
+# Configuración de seguridad
+securityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  fsGroup: 1000
+
+# Configuración de Jenkins
+jenkins:
+  adminUser: admin
+  adminPassword: demo123
+  
+  # Configuración JCasC
+  JCasC:
+    enabled: true
+    configScripts:
+      jenkins-config: |
+        jenkins:
+          systemMessage: "Jenkins para Demo Backstage + OpenWebUI"
+          numExecutors: 2
+          mode: NORMAL
+        
+        security:
+          globalJobDslSecurityConfiguration:
+            useScriptSecurity: false
+
+  # Configuración de plugins
+  installPlugins:
+    - configuration-as-code:1569.vb_72405b_80249
+    - git:5.2.1
+    - workflow-aggregator:596.v8c21c963d92d
+    - kubernetes:4029.v5712230ccb_f8
+    - docker-workflow:572.v950f58993843
+    - pipeline-stage-view:2.33
+
+  # Variables de entorno
+  javaOpts: "-Djenkins.install.runSetupWizard=false -Xmx256m -Xms128m"
+  jenkinsOpts: "--httpPort=8080 --prefix=/jenkins"
+
+# Configuración de persistencia
+persistence:
+  enabled: true
+  storageClass: ""
+  accessMode: ReadWriteOnce
+  size: 2Gi
+  annotations: {}
+
+# Configuración de ingress
+ingress:
+  enabled: true
+  className: "nginx"
+  annotations:
+    nginx.ingress.kubernetes.io/rewrite-target: /$2
+    nginx.ingress.kubernetes.io/configuration-snippet: |
+      proxy_set_header Accept-Encoding "";
+      sub_filter '<head>' '<head> <base href="/jenkins/">';
+      sub_filter_once on;
+  hosts:
+    - host: ""
+      paths:
+        - path: /jenkins(/|$)(.*)
+          pathType: Prefix
+  tls: []
+
+# Configuración de ServiceAccount
+serviceAccount:
+  create: true
+  annotations: {}
+  name: ""
+
+# Configuración RBAC
+rbac:
+  create: true
+  rules:
+    - apiGroups: [""]
+      resources: ["pods", "services", "endpoints", "persistentvolumeclaims", "events", "configmaps", "secrets"]
+      verbs: ["*"]
+    - apiGroups: ["apps"]
+      resources: ["deployments", "daemonsets", "replicasets", "statefulsets"]
+      verbs: ["*"]
+    - apiGroups: ["extensions", "networking.k8s.io"]
+      resources: ["deployments", "ingresses"]
+      verbs: ["*"]
+
+# Configuración de nodos
+nodeSelector: {}
+tolerations: []
+affinity: {}
+
+# Configuración de health checks
+livenessProbe:
+  httpGet:
+    path: /jenkins/login
+    port: 8080
+  initialDelaySeconds: 60
+  periodSeconds: 30
+  timeoutSeconds: 10
+  failureThreshold: 3
+
+readinessProbe:
+  httpGet:
+    path: /jenkins/login
+    port: 8080
+  initialDelaySeconds: 30
+  periodSeconds: 10
+  timeoutSeconds: 5
+  failureThreshold: 3
+
+# Configuración de credenciales
+credentials:
+  dockerhub:
+    username: "edissonz8809"
+    password: "demo-password"
+  
+  minikube:
+    token: "demo-token"
+
+# Configuración de jobs iniciales
+jobs:
+  enabled: true
+  jobs:
+    - name: "backstage-build"
+      description: "Pipeline para construir y desplegar Backstage"
+      scriptPath: "jenkins/pipelines/backstage-pipeline.groovy"
+    - name: "openwebui-build"
+      description: "Pipeline para construir y desplegar OpenWebUI"
+      scriptPath: "jenkins/pipelines/openwebui-pipeline.groovy"
+    - name: "full-deploy"
+      description: "Pipeline completo para desplegar todo el demo"
+      scriptPath: "jenkins/pipelines/full-deploy-pipeline.groovy"
+
+# Configuración específica para demo
+demo:
+  enabled: true
+  minikube:
+    profile: "backstage-demo"
+    namespace: "jenkins"
+  
+  # Configuración de recursos optimizada
+  optimization:
+    enabled: true
+    memory:
+      limit: "512Mi"
+      request: "256Mi"
+    cpu:
+      limit: "500m"
+      request: "100m"
+  
+  # Features habilitadas para demo
+  features:
+    kubernetes: true
+    docker: true
+    helm: true
+    pipelines: true

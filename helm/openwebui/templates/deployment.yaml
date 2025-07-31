@@ -1,0 +1,89 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ include "openwebui.fullname" . }}
+  namespace: {{ include "openwebui.namespace" . }}
+  labels:
+    {{- include "openwebui.labels" . | nindent 4 }}
+    component: frontend
+  annotations:
+    {{- include "openwebui.annotations" . | nindent 4 }}
+spec:
+  {{- if not .Values.autoscaling.enabled }}
+  replicas: {{ .Values.replicaCount }}
+  {{- end }}
+  selector:
+    matchLabels:
+      {{- include "openwebui.selectorLabels" . | nindent 6 }}
+      component: frontend
+  template:
+    metadata:
+      labels:
+        {{- include "openwebui.selectorLabels" . | nindent 8 }}
+        component: frontend
+      annotations:
+        {{- include "openwebui.annotations" . | nindent 8 }}
+        checksum/config: {{ include (print $.Template.BasePath "/configmap.yaml") . | sha256sum }}
+        checksum/secret: {{ include (print $.Template.BasePath "/secret.yaml") . | sha256sum }}
+    spec:
+      serviceAccountName: {{ include "openwebui.serviceAccountName" . }}
+      {{- include "openwebui.podSecurityContext" . | nindent 6 }}
+      initContainers:
+        {{- include "openwebui.initContainerWaitDb" . | nindent 8 }}
+        {{- include "openwebui.initContainerInitData" . | nindent 8 }}
+      containers:
+        - name: {{ .Chart.Name }}
+          image: {{ include "openwebui.image" . }}
+          imagePullPolicy: {{ .Values.image.pullPolicy }}
+          ports:
+            - name: http
+              containerPort: 8080
+              protocol: TCP
+          env:
+            {{- include "openwebui.envVars" . | nindent 12 }}
+          envFrom:
+            - secretRef:
+                name: {{ include "openwebui.fullname" . }}-secrets
+            - secretRef:
+                name: {{ include "openwebui.fullname" . }}-db-secrets
+            {{- if .Values.demo.sampleData.enabled }}
+            - secretRef:
+                name: {{ include "openwebui.fullname" . }}-admin-secrets
+            {{- end }}
+            {{- if .Values.extraEnvVarsCM }}
+            - configMapRef:
+                name: {{ .Values.extraEnvVarsCM }}
+            {{- end }}
+            {{- if .Values.extraEnvVarsSecret }}
+            - secretRef:
+                name: {{ .Values.extraEnvVarsSecret }}
+            {{- end }}
+          volumeMounts:
+            {{- include "openwebui.volumeMounts" . | nindent 12 }}
+          {{- include "openwebui.resources" . | nindent 10 }}
+          livenessProbe:
+            {{- toYaml .Values.livenessProbe | nindent 12 }}
+          readinessProbe:
+            {{- toYaml .Values.readinessProbe | nindent 12 }}
+          {{- include "openwebui.containerSecurityContext" . | nindent 10 }}
+        {{- include "openwebui.sidecarNginx" . | nindent 8 }}
+      volumes:
+        {{- include "openwebui.volumes" . | nindent 8 }}
+        {{- if .Values.sidecars.nginx.enabled }}
+        - name: nginx-config
+          configMap:
+            name: {{ include "openwebui.fullname" . }}-nginx
+            items:
+              - key: nginx.conf
+                path: nginx.conf
+        {{- end }}
+      {{- include "openwebui.nodeSelector" . | nindent 6 }}
+      {{- include "openwebui.affinity" . | nindent 6 }}
+      {{- include "openwebui.tolerations" . | nindent 6 }}
+      {{- with .Values.image.pullSecrets }}
+      imagePullSecrets:
+        {{- toYaml . | nindent 8 }}
+      {{- end }}
+      restartPolicy: Always
+      terminationGracePeriodSeconds: 30
+      dnsPolicy: ClusterFirst

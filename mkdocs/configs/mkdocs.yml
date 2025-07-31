@@ -1,0 +1,310 @@
+# Configuración de MkDocs para Integración Backstage-OpenWebUI
+# Optimizada para demo en Minikube con procesamiento de conversaciones
+
+site_name: 'Backstage-OpenWebUI Documentation Hub'
+site_description: 'Documentación automática generada desde conversaciones de chat y entidades del catálogo'
+site_author: 'Backstage-OpenWebUI Integration'
+site_url: 'http://docs.demo.local'
+
+# Configuración del repositorio
+repo_name: 'backstage-openwebui-demo'
+repo_url: 'https://github.com/edissonz8809/iaops'
+edit_uri: 'edit/main/docs/'
+
+# Directorio de documentos fuente
+docs_dir: '/app/docs-source'
+site_dir: '/app/site'
+
+# Tema y configuración visual
+theme:
+  name: 'material'
+  language: 'es'
+  palette:
+    # Modo claro
+    - media: "(prefers-color-scheme: light)"
+      scheme: default
+      primary: 'blue'
+      accent: 'light blue'
+      toggle:
+        icon: material/brightness-7
+        name: Cambiar a modo oscuro
+    # Modo oscuro
+    - media: "(prefers-color-scheme: dark)"
+      scheme: slate
+      primary: 'blue'
+      accent: 'light blue'
+      toggle:
+        icon: material/brightness-4
+        name: Cambiar a modo claro
+  
+  features:
+    - navigation.tabs
+    - navigation.tabs.sticky
+    - navigation.sections
+    - navigation.expand
+    - navigation.path
+    - navigation.indexes
+    - toc.follow
+    - toc.integrate
+    - search.suggest
+    - search.highlight
+    - search.share
+    - header.autohide
+    - content.code.copy
+    - content.code.annotate
+    - content.tabs.link
+    - content.tooltips
+    - navigation.footer
+    - navigation.tracking
+    - navigation.instant
+    - navigation.instant.prefetch
+  
+  icon:
+    repo: fontawesome/brands/github
+    edit: material/pencil
+    view: material/eye
+    admonition:
+      note: octicons/tag-16
+      abstract: octicons/checklist-16
+      info: octicons/info-16
+      tip: octicons/squirrel-16
+      success: octicons/check-16
+      question: octicons/question-16
+      warning: octicons/alert-16
+      failure: octicons/x-circle-16
+      danger: octicons/zap-16
+      bug: octicons/bug-16
+      example: octicons/beaker-16
+      quote: octicons/quote-16
+
+# Configuración de navegación
+nav:
+  - 'Inicio': 'index.md'
+  - 'Arquitectura':
+    - 'Visión General': 'architecture/overview.md'
+    - 'Componentes': 'architecture/components.md'
+    - 'Integración': 'architecture/integration.md'
+    - 'Diagramas': 'architecture/diagrams.md'
+  - 'Entidades del Catálogo':
+    - 'Componentes': 'catalog/components.md'
+    - 'APIs': 'catalog/apis.md'
+    - 'Recursos': 'catalog/resources.md'
+    - 'Sistemas': 'catalog/systems.md'
+    - 'Dominios': 'catalog/domains.md'
+  - 'Conversaciones de Chat':
+    - 'Resúmenes': 'conversations/summaries.md'
+    - 'Por Entidad': 'conversations/by-entity.md'
+    - 'Insights': 'conversations/insights.md'
+    - 'Análisis': 'conversations/analysis.md'
+  - 'Contenido Generado':
+    - 'Documentación': 'generated/documentation.md'
+    - 'README Files': 'generated/readmes.md'
+    - 'Plantillas': 'generated/templates.md'
+    - 'Enriquecimientos': 'generated/enrichments.md'
+  - 'Guías de Usuario':
+    - 'Inicio Rápido': 'guides/quick-start.md'
+    - 'Chat Contextual': 'guides/contextual-chat.md'
+    - 'Generación de Contenido': 'guides/content-generation.md'
+    - 'Troubleshooting': 'guides/troubleshooting.md'
+  - 'API Reference':
+    - 'Endpoints': 'api/endpoints.md'
+    - 'Webhooks': 'api/webhooks.md'
+    - 'Autenticación': 'api/authentication.md'
+    - 'Ejemplos': 'api/examples.md'
+  - 'Despliegue':
+    - 'Minikube': 'deployment/minikube.md'
+    - 'Kubernetes': 'deployment/kubernetes.md'
+    - 'Configuración': 'deployment/configuration.md'
+    - 'Monitoreo': 'deployment/monitoring.md'
+
+# Plugins de MkDocs
+plugins:
+  - search:
+      lang: 
+        - es
+        - en
+      separator: '[\s\-,:!=\[\]()"/]+|(?!\b)(?=[A-Z][a-z])|\.(?!\d)|&[lg]t;'
+  
+  - minify:
+      minify_html: true
+      minify_js: true
+      minify_css: true
+      htmlmin_opts:
+          remove_comments: true
+      cache_safe: true
+  
+  - git-revision-date-localized:
+      enable_creation_date: true
+      type: datetime
+      timezone: America/Bogota
+      locale: es
+      fallback_to_build_date: true
+  
+  - git-authors:
+      show_contribution: true
+      show_line_count: true
+      count_empty_lines: false
+  
+  - awesome-pages:
+      filename: .pages
+      collapse_single_pages: false
+      strict: false
+  
+  - macros:
+      module_name: mkdocs_macros
+      include_dir: templates
+      include_yaml:
+        - data/entities.yml
+        - data/conversations.yml
+        - data/metrics.yml
+  
+  - mermaid2:
+      arguments:
+        theme: |
+          ^(JSON.parse(__md_get("__palette").index == 1)) ?
+          'dark' : 'light'
+        themeCSS: |
+          .node rect { fill: #1976d2; stroke: #1976d2; }
+          .node text { fill: white; }
+  
+  - table-reader:
+      data_path: "data"
+      search_page_directory: true
+      allow_missing_files: false
+      select_readers:
+        - read_csv
+        - read_json
+        - read_yaml
+
+# Extensiones de Markdown
+markdown_extensions:
+  # Extensiones básicas de Python-Markdown
+  - abbr
+  - admonition
+  - attr_list
+  - def_list
+  - footnotes
+  - md_in_html
+  - toc:
+      permalink: true
+      title: "Contenido"
+      toc_depth: 3
+  - tables
+  - sane_lists
+  - smarty
+  
+  # Extensiones de PyMdown
+  - pymdownx.arithmatex:
+      generic: true
+  - pymdownx.betterem:
+      smart_enable: all
+  - pymdownx.caret
+  - pymdownx.details
+  - pymdownx.emoji:
+      emoji_index: !!python/name:materialx.emoji.twemoji
+      emoji_generator: !!python/name:materialx.emoji.to_svg
+  - pymdownx.highlight:
+      anchor_linenums: true
+      line_spans: __span
+      pygments_lang_class: true
+      use_pygments: true
+      pygments_style: github
+  - pymdownx.inlinehilite
+  - pymdownx.keys
+  - pymdownx.magiclink:
+      repo_url_shorthand: true
+      user: edissonz8809
+      repo: iaops
+  - pymdownx.mark
+  - pymdownx.smartsymbols
+  - pymdownx.superfences:
+      custom_fences:
+        - name: mermaid
+          class: mermaid
+          format: !!python/name:pymdownx.superfences.fence_code_format
+  - pymdownx.tabbed:
+      alternate_style: true
+  - pymdownx.tasklist:
+      custom_checkbox: true
+  - pymdownx.tilde
+  - pymdownx.critic
+  - pymdownx.snippets:
+      base_path: 
+        - docs-source/snippets
+        - templates
+      check_paths: true
+  - pymdownx.progressbar
+
+# Configuración adicional
+extra:
+  # Información del proyecto
+  version:
+    provider: mike
+    default: latest
+  
+  # Variables globales
+  project:
+    name: "Backstage-OpenWebUI Demo"
+    version: "1.0.0"
+    description: "Integración completa entre Backstage y OpenWebUI"
+    
+  # Configuración de analytics (opcional para demo)
+  analytics:
+    provider: google
+    property: G-XXXXXXXXXX
+    feedback:
+      title: ¿Fue útil esta página?
+      ratings:
+        - icon: material/emoticon-happy-outline
+          name: Esta página fue útil
+          data: 1
+          note: >-
+            ¡Gracias por tu feedback!
+        - icon: material/emoticon-sad-outline
+          name: Esta página podría mejorar
+          data: 0
+          note: >-
+            Gracias por tu feedback. Ayúdanos a mejorar esta página.
+  
+  # Configuración social
+  social:
+    - icon: fontawesome/brands/github
+      link: https://github.com/edissonz8809/iaops
+      name: GitHub Repository
+    - icon: fontawesome/brands/docker
+      link: https://hub.docker.com/u/edissonz8809
+      name: Docker Hub
+  
+  # Configuración de consentimiento (GDPR)
+  consent:
+    title: Consentimiento de cookies
+    description: >-
+      Utilizamos cookies para reconocer tus visitas repetidas y preferencias,
+      así como para medir la efectividad de nuestra documentación y si los
+      usuarios encuentran lo que están buscando. Con tu consentimiento, nos
+      ayudas a mejorar nuestra documentación.
+
+# CSS y JavaScript adicional
+extra_css:
+  - stylesheets/extra.css
+  - stylesheets/custom.css
+
+extra_javascript:
+  - javascripts/mathjax.js
+  - https://polyfill.io/v3/polyfill.min.js?features=es6
+  - https://cdn.jsdelivr.net/npm/mathjax@3/es5/tex-mml-chtml.js
+  - javascripts/custom.js
+
+# Configuración de copyright
+copyright: >
+  Copyright &copy; 2025 Backstage-OpenWebUI Demo –
+  <a href="#__consent">Cambiar configuración de cookies</a>
+
+# Configuración de desarrollo
+dev_addr: '0.0.0.0:8000'
+use_directory_urls: true
+strict: false
+watch:
+  - docs-source
+  - templates
+  - data

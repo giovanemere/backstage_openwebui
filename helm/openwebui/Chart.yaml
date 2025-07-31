@@ -1,0 +1,43 @@
+apiVersion: v2
+name: openwebui
+description: OpenWebUI Helm Chart optimizado para demo con Backstage integration
+type: application
+version: ${OPENWEBUI_CHART_VERSION}
+appVersion: ${OPENWEBUI_APP_VERSION}
+
+keywords:
+  - openwebui
+  - ai
+  - chat
+  - llm
+  - backstage
+  - demo
+  - minikube
+
+home: https://github.com/open-webui/open-webui
+sources:
+  - https://github.com/open-webui/open-webui
+  - https://github.com/edissonz8809/iaops
+
+maintainers:
+  - name: Demo Team
+    email: demo@example.com
+    url: https://github.com/edissonz8809/iaops
+
+annotations:
+  category: AI/ML
+  demo.minikube/optimized: "true"
+  demo.minikube/memory-total: "768Mi"
+  demo.minikube/cpu-total: "600m"
+  demo.minikube/storage-total: "3Gi"
+  demo.minikube/description: "OpenWebUI optimizado para demo en Minikube con integración Backstage"
+  demo.minikube/features: "ai-chat,file-upload,backstage-integration"
+  demo.minikube/security-level: "demo"
+  
+dependencies:
+  - name: postgresql
+    version: "~12.0.0"
+    repository: "https://charts.bitnami.com/bitnami"
+    condition: postgresql.enabled
+    tags:
+      - database

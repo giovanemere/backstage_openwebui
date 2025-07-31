@@ -1,0 +1,66 @@
+# ArgoCD Application - Backstage Demo
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: backstage-demo
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: backstage-demo
+    demo.minikube: "true"
+spec:
+  project: default
+  
+  source:
+    repoURL: https://github.com/edissonz8809/iaops
+    targetRevision: main
+    path: helm/backstage-openwebui-demo
+    helm:
+      valueFiles:
+        - values-demo.yaml
+      parameters:
+        - name: backstage.enabled
+          value: "true"
+        - name: openwebui.enabled
+          value: "true"
+        - name: postgresql.enabled
+          value: "true"
+        - name: demo.minikube.optimized
+          value: "true"
+  
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: backstage-demo
+  
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+      allowEmpty: false
+    syncOptions:
+      - CreateNamespace=true
+      - PrunePropagationPolicy=foreground
+      - PruneLast=true
+    retry:
+      limit: 3
+      backoff:
+        duration: 5s
+        factor: 2
+        maxDuration: 3m
+  
+  revisionHistoryLimit: 3
+  
+  # Health check configuration
+  ignoreDifferences:
+    - group: apps
+      kind: Deployment
+      jsonPointers:
+        - /spec/replicas
+  
+  # Demo-specific annotations
+  info:
+    - name: "Demo Mode"
+      value: "Minikube Optimized"
+    - name: "Registry"
+      value: "edissonz8809/iaops"
+    - name: "Resources"
+      value: "1.3Gi RAM, 1.2 CPU total"

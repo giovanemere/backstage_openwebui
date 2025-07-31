@@ -1,0 +1,66 @@
+# ArgoCD Configuration - Demo Minikube
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: argocd-cm
+  namespace: argocd
+  labels:
+    app.kubernetes.io/name: argocd-cm
+    app.kubernetes.io/part-of: argocd
+data:
+  # Server configuration for demo
+  url: "http://argocd:8080/argocd"
+  insecure: "true"
+  
+  # Repository configuration
+  repositories: |
+    - type: git
+      url: https://github.com/edissonz8809/iaops
+      name: demo-repo
+    - type: helm
+      url: https://charts.bitnami.com/bitnami
+      name: bitnami
+  
+  # Resource customizations for demo
+  resource.customizations: |
+    argoproj.io/Application:
+      health.lua: |
+        hs = {}
+        hs.status = "Progressing"
+        hs.message = ""
+        if obj.status ~= nil then
+          if obj.status.health ~= nil then
+            hs.status = obj.status.health.status
+            if obj.status.health.message ~= nil then
+              hs.message = obj.status.health.message
+            end
+          end
+        end
+        return hs
+  
+  # Application configuration
+  application.instanceLabelKey: argocd.argoproj.io/instance
+  
+  # Demo-specific configurations
+  server.insecure: "true"
+  server.rootpath: "/argocd"
+  server.grpc.web: "true"
+  
+  # Optimizations for Minikube
+  timeout.reconciliation: "30s"
+  timeout.hard.reconciliation: "60s"
+  
+  # OIDC configuration (disabled for demo)
+  oidc.config: ""
+  
+  # Dex configuration (disabled for demo)
+  dex.config: ""
+  
+  # Help configuration
+  help.chatUrl: "http://backstage:7007/openwebui"
+  help.chatText: "Chat with OpenWebUI"
+  
+  # UI customizations for demo
+  ui.bannercontent: "🚀 ArgoCD Demo - Backstage + OpenWebUI Integration"
+  ui.bannerurl: "http://backstage:7007"
+  ui.bannerpermanent: "true"

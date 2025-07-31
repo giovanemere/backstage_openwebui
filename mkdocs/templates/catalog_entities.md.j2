@@ -1,0 +1,253 @@
+# {{ kind }}s del Catálogo
+
+Esta página muestra todos los {{ kind }}s del catálogo de Backstage con sus conversaciones asociadas.
+
+## 📊 Resumen de {{ kind }}s
+
+- **Total de {{ kind }}s**: {{ entities|length }}
+- **{{ kind }}s con Conversaciones**: {{ entities|selectattr("metadata.name")|map("string")|map("regex_replace", "^(.*)$", kind + ":default/\\1")|select("in", sessions_by_entity.keys())|list|length }}
+
+## 📋 Lista de {{ kind }}s
+
+{% for entity in entities|sort(attribute='metadata.name') %}
+{% set entity_ref = kind + ":" + (entity.metadata.namespace or "default") + "/" + entity.metadata.name %}
+{% set entity_sessions = sessions_by_entity.get(entity_ref, []) %}
+
+### {{ entity.metadata.name }}
+
+**Namespace**: `{{ entity.metadata.namespace or "default" }}`  
+**Conversaciones**: {{ entity_sessions|length }}
+
+{% if entity.metadata.description %}
+**Descripción**: {{ entity.metadata.description }}
+{% endif %}
+
+{% if entity.metadata.tags %}
+**Tags**: {% for tag in entity.metadata.tags %}`{{ tag }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+
+{% if entity.spec %}
+{% if entity.spec.type %}
+**Tipo**: {{ entity.spec.type }}
+{% endif %}
+{% if entity.spec.lifecycle %}
+**Ciclo de Vida**: {{ entity.spec.lifecycle }}
+{% endif %}
+{% if entity.spec.owner %}
+**Propietario**: {{ entity.spec.owner }}
+{% endif %}
+{% if entity.spec.system %}
+**Sistema**: {{ entity.spec.system }}
+{% endif %}
+{% endif %}
+
+{% if entity.metadata.links %}
+**Enlaces**:
+{% for link in entity.metadata.links %}
+- [{{ link.title or link.url }}]({{ link.url }}){% if link.type %} ({{ link.type }}){% endif %}
+{% endfor %}
+{% endif %}
+
+{% if entity_sessions %}
+#### 💬 Conversaciones Recientes
+
+{% for session in entity_sessions|sort(attribute='updated_at', reverse=true)[:3] %}
+**{{ session.title }}**  
+*{{ session.created_at.strftime('%d/%m/%Y %H:%M') if session.created_at }}* - {{ session.messages|length }} mensajes
+
+{% if session.summary %}
+> {{ session.summary }}
+{% endif %}
+
+{% if session.insights %}
+*Insights*: {% for insight in session.insights[:2] %}`{{ insight }}`{% if not loop.last %}, {% endif %}{% endfor %}
+{% endif %}
+
+---
+{% endfor %}
+
+{% if entity_sessions|length > 3 %}
+*... y {{ entity_sessions|length - 3 }} conversaciones más*
+{% endif %}
+
+{% else %}
+*No hay conversaciones registradas para este {{ kind.lower() }}*
+{% endif %}
+
+---
+
+{% endfor %}
+
+{% if not entities %}
+!!! warning "Sin {{ kind }}s"
+    No se encontraron {{ kind }}s en el catálogo. Esto puede deberse a:
+    
+    - No hay {{ kind }}s registrados en Backstage
+    - Error de conectividad con la API del catálogo
+    - Los {{ kind }}s aún no han sido procesados
+    
+    Verifica la configuración del catálogo y intenta nuevamente.
+{% endif %}
+
+## 📈 Estadísticas de {{ kind }}s
+
+{% if entities %}
+### {{ kind }}s Más Activos (por conversaciones)
+
+{% set entities_with_conversations = [] %}
+{% for entity in entities %}
+  {% set entity_ref = kind + ":" + (entity.metadata.namespace or "default") + "/" + entity.metadata.name %}
+  {% set entity_sessions = sessions_by_entity.get(entity_ref, []) %}
+  {% if entity_sessions %}
+    {% set _ = entities_with_conversations.append((entity, entity_sessions)) %}
+  {% endif %}
+{% endfor %}
+
+{% if entities_with_conversations %}
+| {{ kind }} | Namespace | Conversaciones | Mensajes | Última Actividad |
+|{{ "-" * kind|length }}|-----------|----------------|----------|------------------|
+{% for entity, sessions in entities_with_conversations|sort(attribute='1', key=lambda x: x|length, reverse=true)[:10] %}
+{% set total_messages = sessions|sum(attribute='messages')|length %}
+{% set last_activity = sessions|map(attribute='updated_at')|select|max %}
+| {{ entity.metadata.name }} | {{ entity.metadata.namespace or "default" }} | {{ sessions|length }} | {{ total_messages }} | {{ last_activity.strftime('%d/%m/%Y') if last_activity else 'N/A' }} |
+{% endfor %}
+{% else %}
+*No hay {{ kind }}s con conversaciones registradas*
+{% endif %}
+
+### Distribución por Namespace
+
+{% set namespaces = {} %}
+{% for entity in entities %}
+  {% set ns = entity.metadata.namespace or "default" %}
+  {% if ns not in namespaces %}
+    {% set _ = namespaces.update({ns: {'total': 0, 'with_conversations': 0}}) %}
+  {% endif %}
+  {% set _ = namespaces[ns].update({'total': namespaces[ns]['total'] + 1}) %}
+  {% set entity_ref = kind + ":" + ns + "/" + entity.metadata.name %}
+  {% if entity_ref in sessions_by_entity %}
+    {% set _ = namespaces[ns].update({'with_conversations': namespaces[ns]['with_conversations'] + 1}) %}
+  {% endif %}
+{% endfor %}
+
+| Namespace | Total {{ kind }}s | Con Conversaciones | Cobertura |
+|-----------|{{ "-" * (kind|length + 1) }}|-------------------|-----------|
+{% for ns, stats in namespaces.items()|sort %}
+{% set coverage = (stats.with_conversations / stats.total * 100) if stats.total > 0 else 0 %}
+| {{ ns }} | {{ stats.total }} | {{ stats.with_conversations }} | {{ "%.1f"|format(coverage) }}% |
+{% endfor %}
+
+{% if kind == "Component" %}
+### Distribución por Tipo de Componente
+
+{% set component_types = {} %}
+{% for entity in entities %}
+  {% set comp_type = entity.spec.type if entity.spec and entity.spec.type else "unknown" %}
+  {% if comp_type not in component_types %}
+    {% set _ = component_types.update({comp_type: 0}) %}
+  {% endif %}
+  {% set _ = component_types.update({comp_type: component_types[comp_type] + 1}) %}
+{% endfor %}
+
+| Tipo | Cantidad | Porcentaje |
+|------|----------|------------|
+{% for comp_type, count in component_types.items()|sort(attribute=1, reverse=true) %}
+{% set percentage = (count / entities|length * 100) if entities else 0 %}
+| {{ comp_type }} | {{ count }} | {{ "%.1f"|format(percentage) }}% |
+{% endfor %}
+{% endif %}
+
+{% if kind == "API" %}
+### Distribución por Tipo de API
+
+{% set api_types = {} %}
+{% for entity in entities %}
+  {% set api_type = entity.spec.type if entity.spec and entity.spec.type else "unknown" %}
+  {% if api_type not in api_types %}
+    {% set _ = api_types.update({api_type: 0}) %}
+  {% endif %}
+  {% set _ = api_types.update({api_type: api_types[api_type] + 1}) %}
+{% endfor %}
+
+| Tipo de API | Cantidad | Porcentaje |
+|-------------|----------|------------|
+{% for api_type, count in api_types.items()|sort(attribute=1, reverse=true) %}
+{% set percentage = (count / entities|length * 100) if entities else 0 %}
+| {{ api_type }} | {{ count }} | {{ "%.1f"|format(percentage) }}% |
+{% endfor %}
+{% endif %}
+
+{% endif %}
+
+## 🏷️ Tags Más Utilizados
+
+{% set all_tags = [] %}
+{% for entity in entities %}
+  {% if entity.metadata.tags %}
+    {% for tag in entity.metadata.tags %}
+      {% set _ = all_tags.append(tag) %}
+    {% endfor %}
+  {% endif %}
+{% endfor %}
+
+{% if all_tags %}
+{% set tag_counts = {} %}
+{% for tag in all_tags %}
+  {% set _ = tag_counts.update({tag: tag_counts.get(tag, 0) + 1}) %}
+{% endfor %}
+
+| Tag | {{ kind }}s | Porcentaje |
+|-----|{{ "-" * (kind|length + 1) }}|------------|
+{% for tag, count in tag_counts.items()|sort(attribute=1, reverse=true)[:10] %}
+{% set percentage = (count / entities|length * 100) if entities else 0 %}
+| {{ tag }} | {{ count }} | {{ "%.1f"|format(percentage) }}% |
+{% endfor %}
+{% endif %}
+
+## 💡 Insights de {{ kind }}s
+
+{% if entities_with_conversations %}
+### Patrones de Conversación
+
+{% set all_insights = [] %}
+{% for entity, sessions in entities_with_conversations %}
+  {% for session in sessions %}
+    {% if session.insights %}
+      {% for insight in session.insights %}
+        {% set _ = all_insights.append(insight) %}
+      {% endfor %}
+    {% endif %}
+  {% endfor %}
+{% endfor %}
+
+{% if all_insights %}
+{% set insight_counts = {} %}
+{% for insight in all_insights %}
+  {% set _ = insight_counts.update({insight: insight_counts.get(insight, 0) + 1}) %}
+{% endfor %}
+
+**Patrones más frecuentes en {{ kind }}s**:
+{% for insight, count in insight_counts.items()|sort(attribute=1, reverse=true)[:5] %}
+- **{{ insight }}**: {{ count }} {{ kind }}s ({{ "%.1f"|format(count / entities_with_conversations|length * 100) }}%)
+{% endfor %}
+{% endif %}
+
+### Recomendaciones
+
+{% if entities_with_conversations|length < entities|length * 0.3 %}
+!!! tip "Mejorar Cobertura de Conversaciones"
+    Solo {{ "%.1f"|format(entities_with_conversations|length / entities|length * 100) }}% de los {{ kind }}s tienen conversaciones registradas. 
+    Considera promover el uso del chat contextual para mejorar la documentación automática.
+{% endif %}
+
+{% if entities|selectattr("metadata.description", "undefined")|list|length > entities|length * 0.2 %}
+!!! warning "{{ kind }}s sin Descripción"
+    {{ entities|selectattr("metadata.description", "undefined")|list|length }} {{ kind }}s no tienen descripción. 
+    Las conversaciones pueden ayudar a generar descripciones automáticamente.
+{% endif %}
+
+{% endif %}
+
+---
+
+*Documentación de {{ kind }}s generada automáticamente el {{ generated_at.strftime('%d de %B de %Y a las %H:%M') }}*

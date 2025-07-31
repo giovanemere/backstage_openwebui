@@ -1,0 +1,14 @@
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: openwebui-demo
+  labels:
+    name: openwebui-demo
+    demo.minikube: "true"
+    demo.component: namespace
+    app.kubernetes.io/name: openwebui-demo
+    app.kubernetes.io/part-of: backstage-openwebui-demo
+  annotations:
+    demo.minikube/optimized: "true"
+    demo.minikube/description: "Namespace para demo OpenWebUI + Backstage integration"
+    demo.minikube/ai-chat: "enabled"

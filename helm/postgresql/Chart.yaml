@@ -1,0 +1,24 @@
+apiVersion: v2
+name: postgresql
+description: PostgreSQL database optimized for Backstage + OpenWebUI demo
+type: application
+version: "${POSTGRESQL_CHART_VERSION:-0.1.0}"
+appVersion: "${POSTGRESQL_APP_VERSION:-15.0}"
+keywords:
+  - postgresql
+  - database
+  - backstage
+  - openwebui
+  - demo
+home: "${CHART_HOME_URL:-https://github.com/edissonz8809/iaops}"
+sources:
+  - "${CHART_SOURCE_URL:-https://github.com/edissonz8809/iaops}"
+maintainers:
+  - name: "${CHART_MAINTAINER_NAME:-Amazon Q}"
+    email: "${CHART_MAINTAINER_EMAIL:-demo@example.com}"
+annotations:
+  category: "${POSTGRESQL_CHART_CATEGORY:-Database}"
+  demo.minikube/optimized: "${DEMO_MINIKUBE_OPTIMIZED:-true}"
+  demo.minikube/memory-limit: "${POSTGRES_MEMORY_LIMIT:-256Mi}"
+  demo.minikube/cpu-limit: "${POSTGRES_CPU_LIMIT:-200m}"
+  demo.minikube/features: "${POSTGRESQL_CHART_FEATURES:-shared-database,optimized-config}"
